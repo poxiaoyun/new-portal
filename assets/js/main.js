@@ -15,7 +15,6 @@
   function pr(t) { return '<span class="tf-syntax-property">' + esc(t) + '</span>'; }
   function fn(t) { return '<span class="tf-syntax-function">' + esc(t) + '</span>'; }
   function cm(t) { return '<span class="tf-syntax-comment">' + esc(t) + '</span>'; }
-  var ARROW = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right h-3.5 w-3.5" aria-hidden="true"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>';
 
   /* ---------------------------------------------------------------- nav */
   var nav = $('.pipellm-nav-surface');
@@ -101,80 +100,36 @@
     else if (active > 0 && render) render(active);
   }
 
-  /* -------- 1. control plane: Rune / XMCP / Moha ------------------------ */
+  /* -------- 1. control plane: Rune / Moha / AIRouter / BOSS ------------- */
+  /* The four boards share the plane; selecting a tab highlights its lane and
+     refreshes the outcome row. There is no centre stage panel any more — the
+     Rune Harness core band below the lanes plays that role. */
   var CONTROL = [
-    { lane: 'tf-control-runtime', product: 'Rune', sub: 'AI 训推平台',
-      url: 'https://api.poxiaoshi.cn/v1/jobs',
-      code: [[kw('import'), ' { rune } ' + kw('from'), ' ' + st('"@xiaoshi/rune"'), ';'],
-             [],
-             [kw('const'), ' job = ' + kw('await'), ' ' + fn('rune'), '.' + fn('submit') + '({'],
-             ['  ' + pr('job') + ': ' + st('"llm-finetune-7b"') + ','],
-             ['  ' + pr('pool') + ': ' + st('"gpu-a800-8"') + ','],
-             ['  ' + pr('dataset') + ': ' + st('"moha://datasets/corpus-v3"')],
-             ['});'],
-             [],
-             [cm('// 训练 · 调优 · 推理 · 部署，一次提交')]],
-      models: ['英伟达', '昇腾', '寒武纪'], result: '训练任务已调度',
-      desc: '统一接入异构算力，并把训练或推理任务调度到最优资源池。' },
-    { lane: 'tf-control-gateway', product: 'XMCP', sub: '多云纳管',
-      url: 'https://api.poxiaoshi.cn/multicloud',
-      code: [[kw('import'), ' { Cloud } ' + kw('from'), ' ' + st('"@xiaoshi/xmcp"'), ';'],
-             [],
-             [kw('const'), ' cloud = ' + kw('await'), ' ' + fn('Cloud'), '.' + fn('attach') + '({'],
-             ['  ' + pr('platform') + ': ' + st('"kubernetes"') + ','],
-             ['  ' + pr('region') + ': ' + st('"cn-southwest-1"') + ','],
-             ['  ' + pr('policy') + ': ' + st('"zero-trust-mesh"')],
-             ['});'],
-             [],
-             [cm('// 统一纳管 · 统一策略 · 统一计量')]],
-      models: ['Kubernetes', 'vCenter', 'OpenStack'], result: '多云已纳管',
-      desc: '统一接入多云算力，并把任务调度到最优资源池。' },
-    { lane: 'tf-control-audit', product: 'Moha', sub: 'AI 资产仓库',
-      url: 'https://api.poxiaoshi.cn/assets',
-      code: [[kw('import'), ' { Vault } ' + kw('from'), ' ' + st('"@xiaoshi/moha"'), ';'],
-             [],
-             [kw('const'), ' asset = ' + kw('await'), ' ' + fn('Vault'), '.' + fn('push') + '({'],
-             ['  ' + pr('model') + ': ' + st('"llama-3.1-70b"') + ','],
-             ['  ' + pr('version') + ': ' + st('"v12"') + ','],
-             ['  ' + pr('encrypt') + ': ' + st('"aes-256"')],
-             ['});'],
-             [],
-             [cm('// 加密入库 · 版本可追溯 · 访问留痕')]],
-      models: ['模型', '数据集', 'Tags'], result: '资产已加密入库',
-      desc: '模型与数据集加密存储，版本与访问轨迹全程留痕。' }
+    { lane: 'tf-control-runtime', title: '训练任务已调度',
+      desc: 'Rune 承载训练、调优、推理与部署全流程，算力配额与数据来源全程可见。' },
+    { lane: 'tf-control-audit', title: '资产已加密入库',
+      desc: 'Moha 把模型、数据集与镜像沉淀为可检索、可追溯的加密资产。' },
+    { lane: 'tf-control-airouter', title: '模型调用已授权',
+      desc: 'AIRouter 统一模型入口，协议翻译、策略路由与用量审计一次到位。' },
+    { lane: 'tf-control-boss', title: '计量出账已完成',
+      desc: 'BOSS 让租户、配额、计量与运营数据在同一个控制台闭环。' }
   ];
-
-  var panel = $('.tf-control-gateway');
 
   function renderControl(i) {
     var d = CONTROL[i];
+    if (!d) return;
     CONTROL.forEach(function (x, k) {
       var lane = $('.' + x.lane);
       if (lane) lane.classList.toggle('is-active', k === i);
     });
-    if (!panel) return;
-    var h3 = $('.tf-control-gateway-heading h3', panel);
-    var sub = $('.tf-control-product-heading > div > span', panel);
-    var link = $('.tf-control-gateway-heading a', panel);
-    if (h3) h3.textContent = d.product;
-    if (sub) sub.textContent = d.sub;
-    if (link) link.innerHTML = '进入 ' + esc(d.product) + ARROW;
-
-    var url = $('.tf-control-request-row p', panel);
-    if (url) url.textContent = d.url;
-
-    var code = $('.tf-control-code-surface pre code', panel);
-    if (code) code.innerHTML = d.code.map(function (l) { return l.join(''); }).join('\n');
-
-    var models = $('.tf-control-model-row', panel);
-    if (models) models.innerHTML = d.models.map(function (m) { return '<span>' + esc(m) + '</span>'; }).join('');
-
-    var resTitle = $('.tf-control-plane-result p', panel);
-    if (resTitle) resTitle.innerHTML = '✓ ' + esc(d.result);
-    var resDesc = $('.tf-control-plane-result span:last-child', panel);
+    var plane = $('.tf-control-plane');
+    if (!plane) return;
+    var resTitle = $('.tf-control-plane-result p', plane);
+    if (resTitle) resTitle.innerHTML = '✓ ' + esc(d.title);
+    var resDesc = $('.tf-control-plane-result span:last-child', plane);
     if (resDesc) resDesc.textContent = d.desc;
   }
-  bindTabs($('.tf-control-stage-nav'), renderControl, 1);
+  bindTabs($('.tf-control-stage-nav'), renderControl, 0);
 
   /* -------- 2. gateway cloud-platform tabs ------------------------------ */
   var GW = [

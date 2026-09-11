@@ -34,6 +34,15 @@ h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
   overflow-wrap: anywhere;
 }
 
+/* Sidebar titles live in a 360px column. `word-break:keep-all` offers no break
+   opportunity inside a punctuation-free CJK phrase, so long titles such as
+   「一体化的训推流水线。」 were rendered past the column and silently clipped
+   by `.tf-section{overflow:hidden}`. Let them break between glyphs instead. */
+.tf-section-sidebar .tf-section-title {
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
 /* nav / footer links keep the mono rhythm but need CJK breathing room */
 .tf-nav-menu-link, .tf-footer-link, .tf-nav-dropdown-description { letter-spacing: .01em; }
 
@@ -73,5 +82,372 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 
 /* Chinese text inside mono-labelled UI reads better slightly larger */
 .tf-control-lane-summary b, .tf-gateway-decision b { letter-spacing: .02em; }
+
+/* =========================================================================
+   四大核心板块 · control plane
+   The vendor grid is hard-coded for three products (Rune / XMCP / Moha).
+   The homepage now presents four boards under one Rune Harness core, so the
+   tab strip and the lane grid are widened to four equal tracks.
+   ========================================================================= */
+@media (min-width: 1024px) {
+  .tf-control-stage-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: min(100%, 46rem);
+  }
+  .tf-control-plane-body {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 23rem;
+  }
+  .tf-control-plane-body:before { left: 6%; right: 6%; }
+}
+/* the vendor tab strip is a three-track grid below 1024px as well */
+@media (max-width: 1023px) {
+  .tf-control-stage-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .tf-control-stage-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* the four lanes carry vector marks; the vendor rules only cover bitmaps */
+.tf-control-lane-icon svg { width: 1.35rem; height: 1.35rem; opacity: .8; }
+.tf-control-runtime  .tf-control-lane-icon svg { color: #9fe9ff; }
+.tf-control-audit    .tf-control-lane-icon svg { color: #d7c5ff; }
+.tf-control-airouter .tf-control-lane-icon svg { color: #8affc1; }
+.tf-control-boss     .tf-control-lane-icon svg { color: #ffb36b; }
+
+.tf-control-airouter .tf-control-lane-summary span:last-child { color: #8affc1cc; }
+.tf-control-boss     .tf-control-lane-summary span:last-child { color: #ffb36bcc; }
+
+/* the Rune Harness core band sits between the lanes and the outcome row */
+.tf-control-harness {
+  z-index: 1;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 1.4rem;
+  padding: 1.35rem clamp(1.25rem, 3vw, 2rem);
+  border-top: 1px solid #ffffff1a;
+  background: linear-gradient(90deg, #ffb36b0f, #9fe9ff0a 46%, #d7c5ff0f);
+}
+.tf-control-harness-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border: 1px solid #ffffff2e;
+  border-radius: var(--pl-radius-xxs);
+  background: #0d0e10;
+}
+.tf-control-harness-mark img {
+  width: 1.45rem;
+  height: 1.45rem;
+  object-fit: contain;
+  opacity: .95;
+  filter: grayscale() contrast(1.12) brightness(1.72);
+}
+.tf-control-harness-copy h3 {
+  margin: .55rem 0 0;
+  color: #ffffffe0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.tf-control-harness-copy p:not(.tf-runtime-label) {
+  margin: .5rem 0 0;
+  color: #ffffff75;
+  font-size: .8rem;
+  line-height: 1.6;
+}
+.tf-control-harness-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .45rem;
+}
+.tf-control-harness-chips span {
+  padding: .45rem .62rem;
+  border: 1px solid #ffb36b5c;
+  border-radius: var(--pl-radius-xxs);
+  background: #ffb36b14;
+  color: #ffd9b0d9;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  line-height: 1;
+}
+@media (max-width: 1023px) {
+  .tf-control-harness { grid-template-columns: auto minmax(0, 1fr); gap: 1rem 1.1rem; }
+  .tf-control-harness-chips { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .tf-control-harness { grid-template-columns: 1fr; }
+  .tf-control-harness-mark { display: none; }
+}
+
+/* =========================================================================
+   XCMP 云管理能力优势带
+   XCMP is a capability advantage, not a fourth product deep dive: six cards,
+   no platform-internals walkthrough.
+   ========================================================================= */
+.tf-advantage-inner { padding-bottom: clamp(3.5rem, 5.5vw, 4.75rem); }
+.tf-advantage-head { max-width: 58rem; }
+.tf-advantage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+  margin-top: 2.6rem;
+}
+.tf-advantage-card {
+  position: relative;
+  overflow: hidden;
+  padding: 1.15rem 1.15rem 1.25rem;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--pl-radius-xxs);
+  background: linear-gradient(135deg, #ffffff06, #0000 45%), #0a0b0dc2;
+  transition: border-color .18s, background-color .18s;
+}
+.tf-advantage-card:hover { border-color: #ffffff45; }
+.tf-advantage-card:before,
+.tf-advantage-card:after {
+  content: "";
+  position: absolute;
+  width: .62rem;
+  height: .62rem;
+  border-color: #ffffff42;
+  pointer-events: none;
+}
+.tf-advantage-card:before { top: .7rem; left: .7rem; border-top: 1px solid; border-left: 1px solid; }
+.tf-advantage-card:after { right: .7rem; bottom: .7rem; border-right: 1px solid; border-bottom: 1px solid; }
+.tf-advantage-index {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  letter-spacing: .16em;
+  color: #ffb36bd1;
+}
+.tf-advantage-card h3 { margin: .7rem 0 0; color: #ffffffe6; font-size: .98rem; font-weight: 550; }
+.tf-advantage-card p { margin: .42rem 0 0; color: #ffffff7a; font-size: .78rem; line-height: 1.62; }
+@media (max-width: 1023px) { .tf-advantage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .tf-advantage-grid { grid-template-columns: 1fr; margin-top: 1.9rem; } }
+
+/* eyebrow used above section titles that live outside .tf-section-sidebar */
+.tf-block-overline {
+  display: block;
+  margin: 0 0 1rem;
+  color: #ffffff6b;
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+/* =========================================================================
+   BOSS 运营面板
+   ========================================================================= */
+.tf-boss-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--pl-radius-xs);
+  background: #08090be6;
+  overflow: hidden;
+}
+.tf-boss-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .6rem;
+  padding: 1.15rem 1.5rem 0;
+}
+.tf-boss-metric {
+  padding: .75rem .8rem;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--pl-radius-xxs);
+  background: #ffffff06;
+}
+.tf-boss-metric b {
+  display: block;
+  color: #ffffff6b;
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.tf-boss-metric span { display: block; margin-top: .42rem; color: #ffffffe6; font-size: 1.05rem; font-weight: 600; }
+.tf-boss-metric i { display: block; margin-top: .3rem; color: #9fe9ffcc; font-family: var(--font-mono); font-size: .6rem; font-style: normal; }
+.tf-boss-table {
+  margin: 1.15rem 1.5rem 0;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--pl-radius-xxs);
+  background: #0d0e10c7;
+  overflow: hidden;
+}
+.tf-boss-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, .85fr) minmax(0, .85fr);
+  align-items: center;
+  gap: .75rem;
+  padding: .72rem .95rem;
+  border-top: 1px solid #ffffff14;
+  color: #ffffffc7;
+  font-family: var(--font-mono);
+  font-size: .65rem;
+}
+.tf-boss-row.is-head {
+  border-top: 0;
+  background: #ffffff09;
+  color: #ffffff6b;
+  font-size: .58rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.tf-boss-row .is-ok { color: #8affc1d9; }
+.tf-boss-row .is-live { color: #9fe9ffd9; }
+.tf-boss-row .is-warn { color: #ffb36bd9; }
+.tf-boss-trend {
+  margin: 1.15rem 1.5rem 0;
+  padding-top: .95rem;
+  border-top: 1px solid #ffffff1a;
+}
+.tf-boss-trend-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #ffffff6b;
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.tf-boss-trend-head span:last-child { color: #8affc1d9; letter-spacing: 0; }
+.tf-boss-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: .4rem;
+  height: 3.1rem;
+  margin-top: .8rem;
+}
+.tf-boss-bars i {
+  flex: 1;
+  height: var(--v);
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #9fe9ff8c, #9fe9ff1f);
+}
+.tf-boss-bars i:last-child { background: linear-gradient(180deg, #ffb36bd9, #ffb36b33); }
+.tf-boss-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: auto;
+  padding: 1.15rem 1.5rem 1.35rem;
+  color: #ffffff6b;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+}
+.tf-boss-foot span:last-child { color: #8affc1d9; }
+@media (max-width: 1023px) {
+  .tf-boss-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .tf-boss-metrics,
+  .tf-boss-table { margin-left: 1.15rem; margin-right: 1.15rem; }
+  .tf-boss-metrics { padding: 1rem 0 0; }
+  .tf-boss-row { grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); font-size: .6rem; }
+  .tf-boss-row span:nth-child(3) { display: none; }
+  .tf-boss-trend { margin-left: 1.15rem; margin-right: 1.15rem; }
+  .tf-boss-foot { flex-direction: column; gap: .4rem; padding: 1rem 1.15rem 1.15rem; }
+}
+
+/* =========================================================================
+   Rune Harness 云智算内核（规划）
+   ========================================================================= */
+.tf-harness-head { max-width: 58rem; }
+.tf-harness-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+  margin-top: 2.6rem;
+}
+.tf-harness-phase {
+  position: relative;
+  overflow: hidden;
+  padding: 1.2rem 1.2rem 1.3rem;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--pl-radius-xxs);
+  background: linear-gradient(180deg, #ffffff08, #0000), #0a0b0dc2;
+}
+.tf-harness-phase > span {
+  color: #ffb36bd1;
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  letter-spacing: .18em;
+}
+.tf-harness-phase h3 { margin: .7rem 0 0; color: #ffffffe6; font-size: 1rem; font-weight: 550; }
+.tf-harness-phase p { margin: .45rem 0 0; color: #ffffff7a; font-size: .78rem; line-height: 1.62; }
+.tf-harness-phase ul {
+  display: grid;
+  gap: .38rem;
+  margin: .95rem 0 0;
+  padding: .75rem 0 0;
+  border-top: 1px solid #ffffff14;
+  list-style: none;
+}
+.tf-harness-phase li {
+  display: flex;
+  gap: .45rem;
+  color: #ffffff8c;
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  line-height: 1.5;
+}
+.tf-harness-phase li:before { content: "›"; color: #9fe9ffb3; }
+.tf-harness-flow {
+  margin-top: 1.5rem;
+  border: 1px solid #ffffff1a;
+  border-radius: var(--pl-radius-xxs);
+  background: #0d0e10c2;
+  overflow: hidden;
+}
+.tf-harness-flow-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .85rem 1.15rem;
+  border-bottom: 1px solid #ffffff1a;
+  background: #ffffff06;
+}
+.tf-harness-flow-bar p {
+  margin: 0;
+  color: #ffd9b0e6;
+  font-family: var(--font-mono);
+  font-size: .68rem;
+}
+.tf-harness-flow-bar span { color: #ffffff6b; font-family: var(--font-mono); font-size: .6rem; }
+.tf-harness-flow-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tf-harness-flow-step { padding: 1rem 1.1rem 1.15rem; border-left: 1px solid #ffffff14; }
+.tf-harness-flow-step:first-child { border-left: 0; }
+.tf-harness-flow-step b {
+  display: block;
+  color: #9fe9ffb3;
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  font-weight: 500;
+  letter-spacing: .14em;
+}
+.tf-harness-flow-step strong { display: block; margin-top: .5rem; color: #ffffffe0; font-size: .88rem; font-weight: 600; }
+.tf-harness-flow-step p { margin: .35rem 0 0; color: #ffffff7a; font-size: .72rem; line-height: 1.5; }
+.tf-harness-flow-step span { display: block; margin-top: .55rem; color: #ffffff52; font-family: var(--font-mono); font-size: .58rem; line-height: 1.5; }
+@media (max-width: 1023px) {
+  .tf-harness-grid { grid-template-columns: 1fr; }
+  .tf-harness-flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tf-harness-flow-step { border-left: 0; border-top: 1px solid #ffffff14; }
+  .tf-harness-flow-step:first-child { border-top: 0; }
+}
+@media (max-width: 640px) {
+  .tf-harness-flow-steps { grid-template-columns: 1fr; }
+}
 
 ::selection { background: rgba(125, 243, 240, .28); }
