@@ -20,6 +20,45 @@ body { font-family: var(--font-sans); }
 h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
 .tf-overline, .tf-runtime-overline { letter-spacing: .05em; }
 
+/* -------------------------------------------------------------------------
+   Hero overline "Rune Harness 即将开放"
+   vendor.css paints `.tf-overline::before` as a static white play triangle.
+   That reads as "play", not "in progress", so this one instance opts out and
+   carries an inline SVG instead: a single arc sweeps the track while the core
+   breathes — the conventional "AI is thinking" read.
+   ------------------------------------------------------------------------- */
+.tf-overline-live::before { display: none; }
+.tf-overline-live { gap: .5rem; padding-left: .82rem; }
+
+.tf-thinking {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  overflow: visible;
+}
+.tf-thinking-spin,
+.tf-thinking-core {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+.tf-thinking-spin { animation: tf-thinking-spin 1.5s linear infinite; }
+.tf-thinking-core { animation: tf-thinking-breathe 1.5s ease-in-out infinite; }
+
+@keyframes tf-thinking-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes tf-thinking-breathe {
+  0%, 100% { transform: scale(.7); opacity: .7; }
+  50%      { transform: scale(1.08); opacity: 1; }
+}
+
+/* Honour the OS-level setting: keep the mark legible, drop the motion. */
+@media (prefers-reduced-motion: reduce) {
+  .tf-thinking-spin,
+  .tf-thinking-core { animation: none; }
+  .tf-thinking-core { opacity: 1; }
+}
+
 /* Chinese headings must break on word boundaries, not mid-phrase */
 #home h1, .tf-runtime-story-heading h2, .tf-section-title,
 .tf-home-pricing-intro h2, .tf-managed-api-intro h2,

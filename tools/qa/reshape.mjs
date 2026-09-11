@@ -61,7 +61,21 @@ const probe = `(() => {
   return {
     title: document.title,
     heroTitle: one('#home h1'),
+    heroSubtitle: one('#home h1 + p'),
     heroOverline: one('#home .tf-overline'),
+    heroOrb: !!document.querySelector('#home .tf-overline-live .tf-thinking'),
+    heroOrbSpin: (() => {
+      const e = document.querySelector('#home .tf-thinking-spin');
+      return e ? getComputedStyle(e).animationName : '';
+    })(),
+    heroOrbCore: (() => {
+      const e = document.querySelector('#home .tf-thinking-core');
+      return e ? getComputedStyle(e).animationName : '';
+    })(),
+    heroOrbTriangle: (() => {
+      const e = document.querySelector('#home .tf-overline-live');
+      return e ? getComputedStyle(e, '::before').display : '';
+    })(),
     heroPills: $$('#home .tf-pill').map((e) => clean(e.textContent)),
     navTitles: $$('.tf-nav-dropdown-item .tf-nav-dropdown-title').map((e) => clean(e.textContent)),
     tabs: $$('.tf-control-stage-nav button').map((b) => clean(b.textContent)),
@@ -110,8 +124,14 @@ const has = (label, got, needle) => {
 };
 const results = [
   eq('four boards in the product dropdown', v.navTitles.slice(0, 4), ['Rune', 'Moha', 'AIRouter', 'BOSS']),
-  eq('hero headline names the four-board core', v.heroTitle, '四大产品板块，一个云智算内核'),
-  eq('hero overline lists the four boards', v.heroOverline, 'Rune · Moha · AIRouter · BOSS'),
+  eq('hero slogan stays as authored upstream', v.heroTitle, '智算为中心的 AI 原生云内核'),
+  eq('hero subtitle stays as authored upstream', v.heroSubtitle,
+    '专注云原生开源、混合云与 AI 智算平台，为企业提供覆盖容器云、混合云、智算云及 AI 能力的全栈解决方案。'),
+  eq('hero overline teases Rune Harness', v.heroOverline, 'Rune Harness 即将开放'),
+  eq('overline carries the animated SVG mark', v.heroOrb, true),
+  eq('orb arc is animated', v.heroOrbSpin.includes('tf-thinking-spin'), true),
+  eq('orb core is animated', v.heroOrbCore.includes('tf-thinking-breathe'), true),
+  eq('static play triangle is suppressed', v.heroOrbTriangle, 'none'),
   eq('hero pills list the four boards', v.heroPills, ['Rune 智算', 'Moha 资产', 'AIRouter 网关', 'BOSS 运营']),
   has('document title sells Rune Harness', v.title, 'Rune Harness 云智算内核'),
   eq('control plane exposes four tabs', v.tabs, ['01Rune', '02Moha', '03AIRouter', '04BOSS']),

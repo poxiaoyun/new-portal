@@ -180,6 +180,25 @@ ARROW_R = ('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewB
            'stroke-linejoin="round" class="lucide lucide-arrow-right" aria-hidden="true">'
            '<path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>')
 
+# Inline "thinking" orb for the hero overline. The arc length (8 of a ~53.4
+# circumference) leaves a single visible sweep, which `.tf-thinking-spin` rotates
+# while `.tf-thinking-core` breathes. Both animations are defined in custom.css
+# and disabled under prefers-reduced-motion.
+HARNESS_ORB = (
+    '<svg class="tf-thinking" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<defs><linearGradient id="tf-thinking-grad" x1="0" y1="0" x2="1" y2="1">'
+    '<stop offset="0" stop-color="#9fcfff"></stop>'
+    '<stop offset=".45" stop-color="#ffffff"></stop>'
+    '<stop offset="1" stop-color="#ff8a3d"></stop>'
+    '</linearGradient></defs>'
+    '<circle class="tf-thinking-track" cx="12" cy="12" r="8.5" fill="none" '
+    'stroke="currentColor" stroke-opacity=".16" stroke-width="2"></circle>'
+    '<g class="tf-thinking-spin"><circle cx="12" cy="12" r="8.5" fill="none" '
+    'stroke="url(#tf-thinking-grad)" stroke-width="2" stroke-linecap="round" '
+    'stroke-dasharray="8 45.4"></circle></g>'
+    '<circle class="tf-thinking-core" cx="12" cy="12" r="3" fill="url(#tf-thinking-grad)"></circle>'
+    '</svg>')
+
 
 # ======================================================= stages, in order
 def stage_head():
@@ -282,15 +301,19 @@ def stage_nav():
 
 def stage_hero():
     global body
+    # The hero slogan and its subtitle are deliberately NOT touched: they carry
+    # the company positioning line and stay as authored upstream. `stage_guards`
+    # asserts both strings survive verbatim.
+    #
+    # The overline is a "coming soon" teaser for Rune Harness. Its leading mark
+    # is replaced by an inline animated SVG: `.tf-overline::before` draws a static
+    # white play triangle (see vendor.css), so this instance opts out of it via
+    # `.tf-overline-live` and supplies a sweeping arc + breathing core instead —
+    # the conventional "AI is thinking" read.
     need('<span class="tf-overline" data-page-node-id="xONwR8BFMrwJDv2uXW2pv2">云原生 · 混合云 · AI 智算</span>',
-         '<span class="tf-overline" data-page-node-id="xONwR8BFMrwJDv2uXW2pv2">Rune · Moha · AIRouter · BOSS</span>',
+         '<span class="tf-overline tf-overline-live" data-page-node-id="xONwR8BFMrwJDv2uXW2pv2">'
+         + HARNESS_ORB + 'Rune Harness 即将开放</span>',
          'hero overline')
-    need('>智算为中心的 </span>', '>四大产品板块，</span>', 'hero h1 l1')
-    need('>AI 原生云内核</span>', '>一个云智算内核</span>', 'hero h1 l2')
-    need1('专注云原生开源、混合云与 AI 智算平台，为企业提供覆盖容器云、混合云、智算云及 AI 能力的全栈解决方案。',
-          'Rune 承载 AI 训推，Moha 沉淀模型与数据资产，AIRouter 统一模型网关，BOSS 支撑平台运营与治理——'
-          '四大板块共享同一套权限、配额与可观测体系，共同构成 Rune Harness 云智算内核的基座。',
-          'hero copy')
 
     # hero pills (mobile)
     pa, pb = find_by_attr(body, 'class="mt-10 flex flex-wrap items-center justify-center gap-3 md:hidden"')
@@ -701,7 +724,10 @@ def stage_guards():
                      'PipeLLM', 'pipellm.ai', 'AI Router', 'ChatBox'):
         if leftover in body:
             MISS.append('leftover copy: ' + leftover)
-    for required in ('Rune Harness · 云智算内核', 'tf-control-harness', 'tf-advantage-grid',
+    for required in ('Rune Harness 即将开放', 'tf-overline-live', 'tf-thinking-spin',
+                     '智算为中心的 </span>', 'AI 原生云内核</span>',
+                     '专注云原生开源、混合云与 AI 智算平台，为企业提供覆盖容器云、混合云、智算云及 AI 能力的全栈解决方案。',
+                     'Rune Harness · 云智算内核', 'tf-control-harness', 'tf-advantage-grid',
                      'tf-boss-metrics', 'tf-harness-flow', 'id="harness"', 'id="boss"'):
         if required not in body:
             MISS.append('missing: ' + required)
