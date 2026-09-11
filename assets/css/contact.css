@@ -1,0 +1,206 @@
+/* =========================================================================
+   联系我们（/contact/）
+   -------------------------------------------------------------------------
+   骨架几乎全在 vendor.css 里。联系页用的是一套 pipellm 的 company 组件族，
+   换牌时随样式表一起搬了过来、首页却从未引用过（第一件事就是 grep vendor.css：
+   `.tf-company-contact-layout` / `-form` / `-aside` / `-message`、
+   `.tf-company-form-success` / `-error`、`.tf-company-kicker`、`.tf-company-panel`
+   都已经有规则）。所以这里只做三件事：
+
+     1) 把 pipellm 的品牌橙（#ff8a3d / #ff7f2d）换成本站调色板 —— 联系页在
+        公司级页面里，与 about 页同用 --tf-rune 这一支；
+     2) 补 vendor 没覆盖的：页首、联系方式行、地图容器、地图降级卡；
+     3) 表单的校验态与提交结果（.tf-company-form-error / -success 由 JS 切换）。
+
+   命名统一 .tf-contact- 前缀（vendor 那套 .tf-company-contact-* 保持原名不动），
+   方便一次 grep 出全页归属。图片用 CSS 相对路径（url(../img/…)），不受页面深度影响。
+   ========================================================================= */
+
+/* ----------------------------------------------------------------- 页首 */
+/* 垂直间距**只能写在这里**（同 about.css 的同名块）：vendor.css 是上游 Tailwind
+   的编译产物，`pt-4` / `pb-16` / `md:pb-20` 都不在其中，写在类名上等于没写，
+   页首会贴住 fixed 顶栏。水平方向的 px-* 是存在的，所以只有垂直方向会塌。 */
+.tf-contact-hero {
+  position: relative;
+  overflow: hidden;
+  padding-top: clamp(2rem, 4.2vw, 3.5rem);
+  padding-bottom: clamp(4rem, 6vw, 5rem);
+}
+.tf-contact-hero:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -14rem;
+  width: 54rem;
+  height: 36rem;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--tf-rune-4), transparent);
+  pointer-events: none;
+}
+.tf-contact-hero > * { position: relative; }
+
+/* 页首下的三条快捷联系方式：与 about 页的 .tf-about-hero-meta 同一套语言，
+   但这里是可点的，所以底色与边框都实一些 */
+.tf-contact-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  margin: 2.2rem 0 0;
+}
+.tf-contact-hero-chips > a,
+.tf-contact-hero-chips > span {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 2.35rem;
+  padding: 0 .85rem;
+  border: 1px solid var(--tf-line);
+  background: #ffffff08;
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  letter-spacing: .06em;
+  text-decoration: none;
+}
+.tf-contact-hero-chips > a:hover {
+  border-color: var(--tf-rune-55);
+  background: var(--tf-rune-4);
+  color: var(--tf-rune-85);
+}
+.tf-contact-hero-chips svg { width: .92rem; height: .92rem; }
+
+/* ------------------------------------------------------------ vendor 换色 */
+/* 提交按钮：vendor 给的是 pipellm 的实心橙。本站的按钮体系里 primary 是
+   白底深字（.tf-button-primary），这里对齐它，避免页面上出现第二种主按钮语言。 */
+.tf-company-contact-form button {
+  background: #fff;
+  border-color: #ffffffe6;
+  color: var(--pl-text-inverse);
+}
+.tf-company-contact-form button:hover { background: #dcdce0; }
+.tf-company-contact-aside {
+  background: linear-gradient(135deg, var(--tf-rune-4), transparent 48%);
+}
+.tf-company-kicker { color: var(--tf-rune); }
+
+/* ------------------------------------------------------- 联系方式（aside） */
+.tf-contact-channels {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  margin: 2.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tf-contact-channels > li {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr);
+  align-items: start;
+  gap: .75rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--tf-line);
+}
+.tf-contact-channels > li > svg {
+  width: 1rem;
+  height: 1rem;
+  margin-top: .16rem;
+  color: var(--tf-label);
+}
+.tf-contact-channels b {
+  display: block;
+  margin: 0 0 .3rem;
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .66rem;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.tf-contact-channels a,
+.tf-contact-channels span {
+  color: #ffffffe0;
+  font-size: .84rem;
+  line-height: 1.6;
+  text-decoration: none;
+}
+.tf-contact-channels a { border-bottom: 1px solid var(--tf-line-strong); }
+.tf-contact-channels a:hover { border-bottom-color: var(--tf-rune-55); color: var(--tf-rune-85); }
+
+/* 表单提交结果：vendor 只给了字号与颜色，这里补上「成功时把按钮退到次要态」
+   之类之外的最小版式，避免两行字挤在一起 */
+.tf-company-contact-form .tf-company-form-error,
+.tf-company-contact-form .tf-company-form-success { min-height: 1.1em; }
+.tf-company-contact-form .tf-company-form-error[hidden],
+.tf-company-contact-form .tf-company-form-success[hidden] { display: none; }
+
+/* ----------------------------------------------------------------- 地图 */
+.tf-contact-map-section {
+  width: min(1280px, 100% - 4rem);
+  margin: 0 auto;
+  border: 1px solid var(--tf-line);
+  border-top: 0;
+}
+.tf-contact-map-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .6rem 1.4rem;
+  padding: clamp(1.6rem, 3vw, 2.6rem) clamp(2rem, 4vw, 4rem);
+  border-bottom: 1px solid var(--tf-line);
+}
+.tf-contact-map-head h2 {
+  margin: 0;
+  color: #fffffff0;
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
+  font-weight: 500;
+}
+.tf-contact-map-head p {
+  margin: 0;
+  color: var(--tf-label);
+  font-size: .82rem;
+  line-height: 1.6;
+}
+.tf-contact-map-head .tf-overline { width: 100%; }
+
+/* 腾讯地图 GL JS 要求容器有确定高度，否则不渲染（flex 布局下尤其容易塌成 0） */
+.tf-contact-map {
+  height: clamp(18rem, 32vw, 26rem);
+  background: var(--tf-plate);
+}
+.tf-contact-map canvas { display: block; }
+
+/* SDK 加载失败（线上尚无自备 key 时必然如此）就切到这张卡，别留一块空白。
+   判定与切换在 assets/js/contact.js，这里只管版式。 */
+.tf-contact-map-fallback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  min-height: clamp(9rem, 16vw, 13rem);
+  padding: clamp(1.6rem, 3vw, 2.6rem) clamp(2rem, 4vw, 4rem);
+  background: linear-gradient(135deg, var(--tf-rune-4), transparent 52%);
+}
+.tf-contact-map-fallback[hidden] { display: none; }
+.tf-contact-map-fallback p {
+  margin: 0;
+  color: var(--tf-label);
+  font-size: .84rem;
+  line-height: 1.7;
+}
+.tf-contact-map-fallback p b {
+  display: block;
+  margin-bottom: .35rem;
+  color: #ffffffe0;
+  font-size: .95rem;
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------------- 窄屏 */
+@media (max-width: 900px) {
+  .tf-contact-map-section { width: min(100% - 2rem, 1280px); }
+  .tf-contact-hero-chips > a,
+  .tf-contact-hero-chips > span { font-size: .66rem; }
+}

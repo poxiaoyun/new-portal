@@ -1,0 +1,516 @@
+/* =========================================================================
+   关于我们 · 公司简介（/about/）
+   -------------------------------------------------------------------------
+   只放首页没有的组件。板块外壳（.tf-section-inner / .tf-section-frame /
+   .tf-section-split / .tf-section-sidebar / .tf-overline / .tf-section-title）
+   一律沿用 vendor.css，颜色一律取 custom.css 的 --tf-* 调色板与 vendor.css 的
+   --pl-* 变量 —— 换主题、加板块时不需要动这里。
+
+   命名统一以 .tf-about- 开头，方便一次 grep 出全页归属。图片用 CSS 相对路径
+   （url(../img/…)），不受页面深度影响。
+   ========================================================================= */
+
+/* ----------------------------------------------------------------- 页首 */
+/* 垂直间距**只能写在这里**。踩过的坑：生成器里原本写的是 Tailwind 的
+   `px-6 pb-16 pt-4 md:px-8 md:pb-20 lg:px-20`，但 vendor.css 是上游的编译
+   产物 —— 上游用过什么类才有什么类，`pt-4` / `pb-16` / `md:pb-20` 三个都不在
+   里面。结果顶部内边距实际是 0，页首的 `.tf-overline` 胶囊直接贴住 fixed 顶栏
+   （顶栏只为它留了 116px 的占位，紧贴就看起来像压上去）。px-* 那几个是存在的，
+   所以水平方向一直正常 —— 只有垂直方向塌了。
+   tools/qa/classes.py 现在会拦这类幽灵类。 */
+.tf-about-hero {
+  position: relative;
+  overflow: hidden;
+  /* 顶栏是 fixed + 116px 占位，这里再给内容自己的呼吸位；
+     上限与首页 hero（pt-8 ≈ 2rem）拉开一点，居中的页首需要更多余量。 */
+  padding-top: clamp(2rem, 4.2vw, 3.5rem);
+  padding-bottom: clamp(4rem, 6vw, 5rem);
+}
+.tf-about-hero:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -14rem;
+  width: 54rem;
+  height: 36rem;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--tf-rune-4), transparent);
+  pointer-events: none;
+}
+.tf-about-hero > * { position: relative; }
+
+.tf-about-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .7rem;
+  margin: 2.4rem 0 0;
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.tf-about-hero-meta i {
+  width: .28rem;
+  height: .28rem;
+  border-radius: 50%;
+  background: var(--tf-line-strong);
+  display: inline-block;
+}
+
+/* ------------------------------------------------- 编号特色列表（三个立足点） */
+/* 几何与 .tf-gateway-capabilities 对齐，颜色换成调色板 token */
+.tf-about-pillars { border-top: 1px solid var(--tf-line-strong); }
+.tf-about-pillars-head {
+  margin: 0;
+  padding: .9rem 0;
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .63rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.tf-about-pillar {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr);
+  gap: .75rem;
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--tf-line);
+}
+.tf-about-pillar-index {
+  color: var(--tf-rune);
+  font-family: var(--font-mono);
+  font-size: .66rem;
+}
+.tf-about-pillar h3 {
+  margin: 0;
+  color: #ffffffd6;
+  font-size: .92rem;
+  font-weight: 600;
+}
+.tf-about-pillar > div > p {
+  margin: .35rem 0 0;
+  color: var(--pl-text-muted);
+  font-size: .8rem;
+  line-height: 1.65;
+}
+.tf-about-pillar dl {
+  display: grid;
+  gap: .5rem;
+  margin: .9rem 0 0;
+}
+.tf-about-pillar dl > div {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr);
+  gap: .6rem;
+}
+.tf-about-pillar dt {
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .63rem;
+  letter-spacing: .1em;
+}
+.tf-about-pillar dd {
+  margin: 0;
+  color: #ffffff7a;
+  font-size: .76rem;
+  line-height: 1.55;
+}
+
+/* ------------------------------------------------------------ 关键数字带 */
+/* 走左右分栏：右列 756px 放 2×2，比全宽 4 列更耐读 */
+.tf-about-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--tf-line);
+  border: 1px solid var(--tf-line);
+  border-radius: var(--pl-radius-xs);
+  overflow: hidden;
+}
+.tf-about-stat {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  padding: 1.4rem 1.3rem 1.5rem;
+  background: var(--tf-plate-glass);
+}
+/* 四个格子依次取四个板块色，和站内其他地方的用色语言一致 */
+.tf-about-stat:nth-child(1) { --tf-stat: var(--tf-rune); }
+.tf-about-stat:nth-child(2) { --tf-stat: var(--tf-moha); }
+.tf-about-stat:nth-child(3) { --tf-stat: var(--tf-airouter); }
+.tf-about-stat:nth-child(4) { --tf-stat: var(--tf-boss); }
+.tf-about-stat-value {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: clamp(1.9rem, 3.4vw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.tf-about-stat h3 {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: .35rem 0 0;
+  color: #ffffffde;
+  font-size: .84rem;
+  font-weight: 600;
+}
+.tf-about-stat h3:before {
+  content: "";
+  width: .4rem;
+  height: .4rem;
+  background: var(--tf-stat);
+  flex: none;
+}
+.tf-about-stat-copy {
+  margin: 0;
+  color: var(--tf-label);
+  font-size: .74rem;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------ 核心团队 */
+.tf-about-team {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin: 2.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  background: var(--tf-line);
+  border: 1px solid var(--tf-line);
+  border-radius: var(--pl-radius-xs);
+  overflow: hidden;
+}
+.tf-about-member {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 1.15rem;
+  align-items: start;
+  padding: 1.5rem;
+  background: var(--tf-plate-glass);
+}
+/* 没有真人肖像可用，也不该拿别人的图顶上：用姓氏字标 + 站点底纹做识别块 */
+.tf-about-member-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--tf-line-strong);
+  border-radius: var(--pl-radius-xxs);
+  background: linear-gradient(#ffffff12, #ffffff05), var(--tf-plate);
+}
+.tf-about-member-mark:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url(../img/grid-ambient.webp) center/cover no-repeat;
+  opacity: .3;
+  mix-blend-mode: screen;
+}
+.tf-about-member-mark b {
+  position: relative;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+.tf-about-member-copy h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.tf-about-member-role {
+  margin: .35rem 0 0;
+  color: var(--tf-rune-80);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .1em;
+}
+.tf-about-member-bio {
+  margin: .8rem 0 0;
+  color: var(--pl-text-muted);
+  font-size: .8rem;
+  line-height: 1.7;
+}
+
+/* 招聘条（对应 pipellm about 的 WE'RE HIRING 横条） */
+.tf-about-hiring {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: center;
+  margin-top: .85rem;
+  padding: 1.15rem 1.4rem;
+  overflow: hidden;
+  border: 1px solid var(--tf-line);
+  border-radius: var(--pl-radius-xs);
+  background: linear-gradient(#ffffff08, #ffffff03), var(--tf-plate-glass);
+}
+.tf-about-hiring:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--tf-airouter);
+}
+.tf-about-hiring-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  color: var(--tf-airouter);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  white-space: nowrap;
+}
+.tf-about-hiring-tag i {
+  width: .45rem;
+  height: .45rem;
+  background: currentColor;
+  display: inline-block;
+}
+.tf-about-hiring-copy {
+  margin: 0;
+  color: var(--pl-text-muted);
+  font-size: .8rem;
+  line-height: 1.55;
+}
+.tf-about-hiring-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  color: #ffffffe6;
+  font-size: .82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color .3s;
+}
+.tf-about-hiring-link:hover { color: var(--tf-airouter); }
+
+/* ------------------------------------------------------------ 公司荣誉 */
+/* 星环与光晕画在独立 stage 里。注意不要给 .tf-section-inner 加 overflow:hidden ——
+   它就是 .tf-section-frame，那四个 -1px 的角标会被一起切掉。 */
+.tf-about-honors-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tf-about-orbit {
+  position: absolute;
+  left: 50%;
+  top: -8rem;
+  width: min(60rem, 130%);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+}
+.tf-about-orbit span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--tf-line);
+  border-radius: 50%;
+}
+.tf-about-orbit span:nth-child(2) { inset: 7.5%; border-color: var(--tf-rune-12); }
+.tf-about-orbit span:nth-child(3) { inset: 15%; }
+.tf-about-honors-glow {
+  position: absolute;
+  left: 50%;
+  top: -1rem;
+  z-index: 0;
+  width: 46rem;
+  height: 28rem;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--tf-rune-4), transparent);
+  pointer-events: none;
+}
+.tf-about-honors .tf-section-heading,
+.tf-about-honors-count,
+.tf-about-honors-grid { position: relative; z-index: 1; }
+
+.tf-about-honors-count {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  margin: 2.2rem 0 0;
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.tf-about-honors-count b {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.tf-about-honors-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .65rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tf-about-honor {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  min-height: 7.4rem;
+  padding: 1.05rem 1rem 1.15rem;
+  border: 1px solid var(--tf-line);
+  border-radius: var(--pl-radius-xxs);
+  background: var(--tf-plate-glass);
+  transition: border-color .3s, background-color .3s;
+}
+.tf-about-honor:hover {
+  border-color: var(--tf-line-strong);
+  background: #ffffff0a;
+}
+.tf-about-honor-index {
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .62rem;
+  letter-spacing: .1em;
+}
+.tf-about-honor h3 {
+  margin: auto 0 0;
+  color: #ffffffde;
+  font-size: .86rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.tf-about-honor p {
+  margin: 0;
+  color: var(--tf-label);
+  font-size: .68rem;
+  line-height: 1.45;
+}
+
+/* ------------------------------------------------------------ 发展历程 */
+.tf-about-milestone-track {
+  position: relative;
+  margin-top: 2.6rem;
+}
+/* 节点连线：从一个圆点圆心到最后一个，末端渐隐 */
+.tf-about-milestone-track:before {
+  content: "";
+  position: absolute;
+  left: .3rem;
+  right: 12%;
+  top: 1.9rem;
+  height: 1px;
+  background: linear-gradient(90deg, var(--tf-line-strong), var(--tf-line), transparent);
+}
+.tf-about-milestones {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tf-about-milestone {
+  position: relative;
+  padding-top: 3.2rem;
+}
+.tf-about-milestone-dot {
+  position: absolute;
+  left: 0;
+  top: 1.6rem;
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: var(--tf-rune);
+  box-shadow: 0 0 0 4px var(--tf-plate), 0 0 16px var(--tf-rune-55);
+}
+.tf-about-milestone-year {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.tf-about-milestone-copy {
+  max-width: 15rem;
+  margin: .6rem 0 0;
+  color: var(--pl-text-muted);
+  font-size: .82rem;
+  line-height: 1.65;
+}
+
+/* ------------------------------------------------------------ 收尾 CTA */
+/* .tf-contact-cta-secondary 是 flex 纵列，链接组用 margin-top:auto 压到底 */
+.tf-about-cta-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem 1.6rem;
+  margin-top: auto;
+  padding-top: 1.6rem;
+}
+.tf-about-cta-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  color: #ffffffe6;
+  font-size: .85rem;
+  font-weight: 600;
+  transition: color .3s;
+}
+.tf-about-cta-links a:hover { color: #ffffffa8; }
+.tf-about-cta-links svg { width: .95rem; height: .95rem; }
+
+/* ------------------------------------------------------------ 响应式 */
+@media (max-width: 1024px) {
+  /* ≤1023px 时 .tf-section-split 塌成一列（vendor.css），数字带吃满宽度 */
+  .tf-about-honors-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tf-about-milestones { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2rem 1.5rem; }
+}
+
+@media (max-width: 768px) {
+  .tf-about-pillar { grid-template-columns: 1.9rem minmax(0, 1fr); }
+  .tf-about-team { grid-template-columns: 1fr; }
+  .tf-about-member { grid-template-columns: 3.4rem minmax(0, 1fr); gap: .9rem; padding: 1.2rem; }
+  .tf-about-member-mark { width: 3.4rem; }
+  .tf-about-member-mark b { font-size: 1.2rem; }
+  .tf-about-hiring {
+    grid-template-columns: 1fr;
+    gap: .7rem;
+    padding: 1.15rem 1.2rem;
+  }
+  .tf-about-honors-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tf-about-honor { min-height: 6.6rem; }
+  .tf-about-cta-links { padding-top: 1.2rem; }
+}
+
+@media (max-width: 560px) {
+  .tf-about-stats { grid-template-columns: 1fr; }
+  .tf-about-milestones { grid-template-columns: 1fr; gap: 1.7rem; }
+  .tf-about-milestone { padding-top: 2.6rem; }
+  .tf-about-milestone-dot { top: 1.15rem; }
+  .tf-about-milestone-track:before { top: 1.45rem; right: 30%; }
+  .tf-about-milestone-copy { max-width: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-about-honor,
+  .tf-about-hiring-link,
+  .tf-about-cta-links a { transition: none; }
+}

@@ -12,6 +12,50 @@
                Menlo, Consolas, "PingFang SC", "Microsoft YaHei", monospace;
 }
 
+/* -------------------------------------------------------------------------
+   调色板
+   四个板块的强调色在下面这份样式表里以字面量出现过 22 次、共 13 种透明度
+   变体，中性线/文字色也各重复出现 5~6 次。新增板块、换主题或调整对比度时，
+   这里是唯一需要动的地方。
+
+   命名：`--tf-<板块>[-<名义 alpha 百分数>]`。括号里的百分数是给人读的标签，
+   **以十六进制为准**（例如 0x8c/255 = 54.9%，记作 55）。没有后缀的即 100%。
+
+   这套色值同时出现在另外两处，改名要一起改，stage_guards() 会交叉断言：
+     - tools/reshape_home.py 的 PRODUCTS[].pill（hero pills 的圆点色）
+     - assets/js/main.js 的 CONTROL[].lane 与 AUDIT[].color（板块 lane / 审计卡）
+   ------------------------------------------------------------------------- */
+:root {
+  --tf-rune: #9fe9ff;
+  --tf-rune-4: #9fe9ff0a;
+  --tf-rune-12: #9fe9ff1f;
+  --tf-rune-55: #9fe9ff8c;
+  --tf-rune-80: #9fe9ffcc;
+  --tf-rune-85: #9fe9ffd9;
+
+  --tf-moha: #d7c5ff;
+  --tf-moha-6: #d7c5ff0f;
+
+  --tf-airouter: #8affc1;
+  --tf-airouter-80: #8affc1cc;
+  --tf-airouter-85: #8affc1d9;
+
+  --tf-boss: #ffb36b;
+  --tf-boss-6: #ffb36b0f;
+  --tf-boss-8: #ffb36b14;
+  --tf-boss-20: #ffb36b33;
+  --tf-boss-36: #ffb36b5c;
+  --tf-boss-80: #ffb36bcc;
+  --tf-boss-85: #ffb36bd9;
+
+  /* 面板与分割线：白色透明度与深色底板在整个文件里反复出现 */
+  --tf-line: #ffffff1a;
+  --tf-line-strong: #ffffff2e;
+  --tf-label: #ffffff6b;
+  --tf-plate: #0d0e10;
+  --tf-plate-glass: #08090be6;
+}
+
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
 body { font-family: var(--font-sans); }
@@ -22,13 +66,15 @@ h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
 
 /* -------------------------------------------------------------------------
    Hero overline "Rune Harness 即将开放"
-   vendor.css paints `.tf-overline::before` as a static white play triangle.
-   That reads as "play", not "in progress", so this one instance opts out and
-   carries an inline SVG instead: a single arc sweeps the track while the core
-   breathes — the conventional "AI is thinking" read.
+   vendor.css paints `.tf-overline::before` as a static white play triangle,
+   which reads as "play", not as a status teaser. This one instance opts out of
+   it and is a plain text pill. Hiding the mark also removes the ~1.17rem it plus
+   the flex gap used to occupy, so the left padding is set level with the right
+   one to keep the pill visually centred. The animated thinking orb that used to
+   sit here now lives on the hero chat avatar only.
    ------------------------------------------------------------------------- */
 .tf-overline-live::before { display: none; }
-.tf-overline-live { gap: .5rem; padding-left: .82rem; }
+.tf-overline-live { padding-left: 1.05rem; }
 
 .tf-thinking {
   width: 1rem;
@@ -57,18 +103,147 @@ h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
   .tf-thinking-spin,
   .tf-thinking-core { animation: none; }
   .tf-thinking-core { opacity: 1; }
+  /* the hero chat is a timeline, not decoration: without motion there is no
+     way to "wait" for the result, so show the whole thread at once and settle
+     the thinking row on its finished state */
+  .tf-chat-user,
+  .tf-chat-ai,
+  .tf-chat-done { animation: none; opacity: 1; transform: none; }
+  .tf-chat-dots { animation: none; opacity: 0; }
+  .tf-chat-dots i { animation: none; opacity: .6; }
+  .tf-chat-state-thinking { animation: none; opacity: 0; }
+  .tf-chat-state-done { animation: none; opacity: 1; }
 }
+
+/* =========================================================================
+   英雄区中间终端 · Rune Harness 对话回放
+   The centre terminal drops its upstream command/result lines and replays a
+   harness conversation instead: the user asks in plain language (right), the
+   harness mark thinks on the left, then the deploy result lands underneath.
+   The whole timeline is pure CSS so it survives without JS and so nothing has
+   to fight the hero's existing vendor animations.
+
+   Cycle is 9.6s, i.e. 1s = 10.4167%:
+     user turn in    0    → 0.40s   (0%    → 4.2%)
+     harness turn in 0.45 → 0.85s   (4.7%  → 8.9%)
+     thinking        0.45 → 3.45s   (exactly 3s, 正在思考 + bouncing dots)
+     result in       3.45 → 3.85s   (36%   → 40.2%)
+       ↳ same window: label flips 正在思考 → 已处理, dots retire
+     hold            3.85 → 8.90s
+     fade out        8.90 → 9.60s   (92.7% → 100%)
+   ========================================================================= */
+/* the thread is taller than the three monospace lines it replaces, so trim the
+   body padding to keep the centre terminal the same height as its neighbours */
+.tf-terminal-body.main { padding: .95rem 1.15rem 1.05rem; }
+
+.tf-chat { display: flex; flex-direction: column; gap: .5rem; }
+.tf-chat-row { display: flex; align-items: flex-start; gap: .5rem; }
+
+/* user turn — plain language, right aligned */
+.tf-chat-user { justify-content: flex-end; }
+.tf-chat-bubble {
+  margin: 0;
+  padding: .42rem .78rem;
+  border: 1px solid #ffffff26;
+  border-radius: .78rem .78rem .22rem .78rem;
+  background: linear-gradient(180deg, #ffffff1f, #ffffff0d);
+  color: #ffffffdc;
+  font-family: var(--font-sans);
+  font-size: .84rem;
+  line-height: 1.5;
+  letter-spacing: .01em;
+}
+
+/* harness turn — the same thinking mark as the hero overline */
+.tf-chat-avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--tf-line-strong);
+  border-radius: .45rem;
+  background: var(--tf-plate);
+  color: #ffffff;
+}
+.tf-chat-avatar .tf-thinking { width: 1.05rem; height: 1.05rem; }
+.tf-chat-thinking { display: flex; align-items: center; gap: .45rem; min-height: 1.6rem; }
+/* Two stacked states share one grid cell, so the label can swap without the
+   row reflowing (正在思考 and 已处理 are different widths). */
+.tf-chat-label { display: inline-grid; color: #ffffff8f; font-size: .76rem; }
+.tf-chat-state { grid-area: 1 / 1; white-space: nowrap; }
+.tf-chat-dots { display: inline-flex; gap: .18rem; animation: tf-chat-thinking-visible 9.6s linear infinite; }
+.tf-chat-dots i {
+  width: .22rem;
+  height: .22rem;
+  border-radius: 50%;
+  background: #ffffffb8;
+  animation: tf-chat-dot 1.2s ease-in-out infinite;
+}
+.tf-chat-dots i:nth-child(2) { animation-delay: .15s; }
+.tf-chat-dots i:nth-child(3) { animation-delay: .3s; }
+
+/* result line */
+.tf-chat-done { display: flex; align-items: center; gap: .4rem; color: var(--tf-airouter); font-size: .82rem; }
+.tf-chat-check { font-weight: 600; }
+
+@keyframes tf-chat-dot {
+  0%, 100% { opacity: .28; transform: translateY(0); }
+  50%      { opacity: 1;   transform: translateY(-.14rem); }
+}
+@keyframes tf-chat-turn-user {
+  0%     { opacity: 0; transform: translateY(.4rem); }
+  4.2%   { opacity: 1; transform: none; }
+  92.7%  { opacity: 1; transform: none; }
+  100%   { opacity: 0; transform: none; }
+}
+@keyframes tf-chat-turn-ai {
+  0%, 4.7% { opacity: 0; transform: translateY(.4rem); }
+  8.9%     { opacity: 1; transform: none; }
+  92.7%    { opacity: 1; transform: none; }
+  100%     { opacity: 0; transform: none; }
+}
+@keyframes tf-chat-turn-done {
+  0%, 36%  { opacity: 0; transform: translateY(.4rem); }
+  40.2%    { opacity: 1; transform: none; }
+  92.7%    { opacity: 1; transform: none; }
+  100%     { opacity: 0; transform: none; }
+}
+.tf-chat-user, .tf-chat-ai, .tf-chat-done { opacity: 0; }
+.tf-chat-user { animation: tf-chat-turn-user 9.6s linear infinite; }
+.tf-chat-ai   { animation: tf-chat-turn-ai 9.6s linear infinite; }
+.tf-chat-done { animation: tf-chat-turn-done 9.6s linear infinite; }
+
+/* The thinking row settles when the result lands: the label flips to 已处理 and
+   the bouncing dots go away. Both ride the same 36% → 40.2% window as
+   `.tf-chat-turn-done`, so the swap is phase-locked to the green line. */
+@keyframes tf-chat-thinking-visible {
+  0%, 4.7% { opacity: 0; }
+  8.9%     { opacity: 1; }
+  38%      { opacity: 1; }
+  40.2%    { opacity: 0; }
+  100%     { opacity: 0; }
+}
+@keyframes tf-chat-state-settled {
+  0%, 36%  { opacity: 0; }
+  40.2%    { opacity: 1; }
+  92.7%    { opacity: 1; }
+  100%     { opacity: 0; }
+}
+.tf-chat-state-thinking { animation: tf-chat-thinking-visible 9.6s linear infinite; }
+.tf-chat-state-done { opacity: 0; animation: tf-chat-state-settled 9.6s linear infinite; }
 
 /* Chinese headings must break on word boundaries, not mid-phrase */
 #home h1, .tf-runtime-story-heading h2, .tf-section-title,
-.tf-home-pricing-intro h2, .tf-managed-api-intro h2,
+.tf-home-pricing-intro h2,
 .tf-faq-intro h2, .tf-contact-cta-primary h2, .tf-blog-overview h2 {
   line-break: strict;
   word-break: keep-all;
   overflow-wrap: normal;
   text-wrap: balance;
 }
-.tf-section-copy, .tf-managed-api-intro p, .tf-runtime-story-heading > p {
+.tf-section-copy, .tf-runtime-story-heading > p {
   line-break: strict;
   overflow-wrap: anywhere;
 }
@@ -82,8 +257,24 @@ h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
   overflow-wrap: break-word;
 }
 
+/* Moha 板块的标题不在 .tf-section-sidebar 里，而是放在整宽的 .tf-section-heading，
+   于是吃到 vendor 里 .tf-section-title 的基础字号 clamp(2.35rem,4vw,3.55rem)——
+   比 Rune / AIRouter / BOSS 走的 sidebar 变体 clamp(2.1rem,3.25vw,3.05rem) 大一档。
+   这里把两者对齐（2026-09-11）。选择器命中唯一：整页只有一个 .tf-section-heading。 */
+.tf-section-heading .tf-section-title {
+  font-size: clamp(2.1rem, 3.25vw, 3.05rem);
+}
+
 /* nav / footer links keep the mono rhythm but need CJK breathing room */
 .tf-nav-menu-link, .tf-footer-link, .tf-nav-dropdown-description { letter-spacing: .01em; }
+
+/* 产品下拉的四项图标：原站用的是 fill="currentColor" 的填充图标，所以 vendor.css
+   按填充语义把描边归零——
+     .tf-nav-product-menu .tf-nav-dropdown-icon svg { stroke-width: 0; width: 20px; height: 20px }
+   而重排后的四项换成 lucide 描边图标（fill="none" + stroke="currentColor"），
+   描边一旦为 0 就整个不可见：产品名左边空白，正是这个原因。
+   同选择器 + custom.css 后加载，稳定压过 vendor，无需动 vendor.css。 */
+.tf-nav-product-menu .tf-nav-dropdown-icon svg { stroke-width: 2; }
 
 /* customer wordmarks: wide raster logos, keep them optically even */
 .tf-partner-logo.is-wordmark img {
@@ -92,10 +283,14 @@ h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
   width: auto;
 }
 
-/* footer wordmark: the Latin original is 10 narrow glyphs, 晓石云智算平台 is 7
-   full-width ones, so the vendor clamp (min 3.2rem) overflows the shell below
-   ~600px and the tail gets clipped by .tf-footer-branding{overflow:hidden}.
-   Size it off the character count instead (7 x ~1.05em ~= 7.4em of shell). */
+/* footer wordmark: the vendor clamp (min 3.2rem) is tuned for 10 narrow Latin
+   glyphs and overflows the shell below ~600px, where the tail gets clipped by
+   .tf-footer-branding{overflow:hidden}. So the size is derived from the glyph
+   count instead: at 7 full-width characters 7.35em ~= 92% of the 1136px shell
+   content box, which is what this clamp was tuned for.
+   2026-09-11: the wordmark now reads 破晓石科技 (5 glyphs), so it fills ~66% of
+   the shell and sits centred. Bump to clamp(2.24rem, 13.86vw, 12.6rem) -- the
+   same 7/5 ratio -- if it should span the old width again. */
 .tf-footer-brand-word { font-size: clamp(1.6rem, 9.9vw, 9rem); letter-spacing: .05em; font-weight: 600; }
 .tf-footer-brand-word > span { background-size: 100% 100%, 118%; }
 
@@ -103,13 +298,32 @@ h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
 .tf-icon-hero img { width: 2.1rem; height: 2.1rem; }
 .tf-icon-hero.center img { width: 3.05rem; height: 3.05rem; }
 
-/* keep deep-dive code panels at a comfortable reading width */
-.tf-gateway-code { min-height: 440px; }
-.tf-gateway-code .tf-syntax-comment { color: #6f7684; font-style: italic; }
+/* The hub mark at the centre of the hero animation and the Rune Harness band
+   mark are the same asset (assets/img/icon-mark.svg), so they share one
+   treatment: desaturated and brightened into a light glyph on the dark plate
+   rather than the raw teal/violet brand gradient, which reads as a different
+   object against the mono hero art. Keep them on a single selector so the two
+   cannot drift apart.
 
-/* reveal-on-scroll helper applied by main.js */
-.tf-reveal { opacity: 0; transform: translate3d(0, 22px, 0); }
-.tf-reveal.is-in { opacity: 1; transform: none; }
+   The nav lockup (assets/img/logo.svg) carries the same light glyph, but it is
+   an <img> holding the mark AND the wordmark, so it cannot join this selector:
+   brightness() would run over the white wordmark too and fatten every glyph
+   edge. Its stops are the filter's output instead, frozen in tools/gen_icons.py
+   §10. Change the numbers here and re-derive them there. */
+.tf-icon-hero.center img,
+.tf-control-harness-mark img {
+  object-fit: contain;
+  opacity: .95;
+  filter: grayscale() contrast(1.12) brightness(1.72);
+}
+
+/* 2026-09-11 清理：以下三组规则的元素已随 #gateway / XCMP 优势带一起移除，
+   产物与 main.js 里都没有命中（.tf-reveal 也从未被 main.js 施加过——真正的
+   滚动入场走 .tf-motion-section + is-motion-visible）：
+     .tf-gateway-code / .tf-syntax-comment
+     .tf-reveal / .tf-reveal.is-in
+     .tf-block-overline
+   vendor.css 里同名族（.tf-managed-api-*、.tf-footer-status 等）按约定不动。 */
 
 /* until main.js boots, never leave content hidden */
 html:not(.js-ready) .tf-motion-section { opacity: 1; transform: none; }
@@ -120,7 +334,7 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 .tf-mobile-open { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }
 
 /* Chinese text inside mono-labelled UI reads better slightly larger */
-.tf-control-lane-summary b, .tf-gateway-decision b { letter-spacing: .02em; }
+.tf-control-lane-summary b { letter-spacing: .02em; }
 
 /* =========================================================================
    四大核心板块 · control plane
@@ -149,13 +363,13 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 
 /* the four lanes carry vector marks; the vendor rules only cover bitmaps */
 .tf-control-lane-icon svg { width: 1.35rem; height: 1.35rem; opacity: .8; }
-.tf-control-runtime  .tf-control-lane-icon svg { color: #9fe9ff; }
-.tf-control-audit    .tf-control-lane-icon svg { color: #d7c5ff; }
-.tf-control-airouter .tf-control-lane-icon svg { color: #8affc1; }
-.tf-control-boss     .tf-control-lane-icon svg { color: #ffb36b; }
+.tf-control-runtime  .tf-control-lane-icon svg { color: var(--tf-rune); }
+.tf-control-audit    .tf-control-lane-icon svg { color: var(--tf-moha); }
+.tf-control-airouter .tf-control-lane-icon svg { color: var(--tf-airouter); }
+.tf-control-boss     .tf-control-lane-icon svg { color: var(--tf-boss); }
 
-.tf-control-airouter .tf-control-lane-summary span:last-child { color: #8affc1cc; }
-.tf-control-boss     .tf-control-lane-summary span:last-child { color: #ffb36bcc; }
+.tf-control-airouter .tf-control-lane-summary span:last-child { color: var(--tf-airouter-80); }
+.tf-control-boss     .tf-control-lane-summary span:last-child { color: var(--tf-boss-80); }
 
 /* the Rune Harness core band sits between the lanes and the outcome row */
 .tf-control-harness {
@@ -166,8 +380,8 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   align-items: center;
   gap: 1.4rem;
   padding: 1.35rem clamp(1.25rem, 3vw, 2rem);
-  border-top: 1px solid #ffffff1a;
-  background: linear-gradient(90deg, #ffb36b0f, #9fe9ff0a 46%, #d7c5ff0f);
+  border-top: 1px solid var(--tf-line);
+  background: linear-gradient(90deg, var(--tf-boss-6), var(--tf-rune-4) 46%, var(--tf-moha-6));
 }
 .tf-control-harness-mark {
   display: flex;
@@ -175,16 +389,15 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   justify-content: center;
   width: 2.8rem;
   height: 2.8rem;
-  border: 1px solid #ffffff2e;
+  border: 1px solid var(--tf-line-strong);
   border-radius: var(--pl-radius-xxs);
-  background: #0d0e10;
+  background: var(--tf-plate);
 }
+/* size only — the shared mono treatment lives with `.tf-icon-hero.center img`
+   at the top of this file, so the hero hub and this band mark cannot drift */
 .tf-control-harness-mark img {
   width: 1.45rem;
   height: 1.45rem;
-  object-fit: contain;
-  opacity: .95;
-  filter: grayscale() contrast(1.12) brightness(1.72);
 }
 .tf-control-harness-copy h3 {
   margin: .55rem 0 0;
@@ -207,9 +420,9 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 }
 .tf-control-harness-chips span {
   padding: .45rem .62rem;
-  border: 1px solid #ffb36b5c;
+  border: 1px solid var(--tf-boss-36);
   border-radius: var(--pl-radius-xxs);
-  background: #ffb36b14;
+  background: var(--tf-boss-8);
   color: #ffd9b0d9;
   font-family: var(--font-mono);
   font-size: .62rem;
@@ -224,61 +437,9 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   .tf-control-harness-mark { display: none; }
 }
 
-/* =========================================================================
-   XCMP 云管理能力优势带
-   XCMP is a capability advantage, not a fourth product deep dive: six cards,
-   no platform-internals walkthrough.
-   ========================================================================= */
-.tf-advantage-inner { padding-bottom: clamp(3.5rem, 5.5vw, 4.75rem); }
-.tf-advantage-head { max-width: 58rem; }
-.tf-advantage-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .85rem;
-  margin-top: 2.6rem;
-}
-.tf-advantage-card {
-  position: relative;
-  overflow: hidden;
-  padding: 1.15rem 1.15rem 1.25rem;
-  border: 1px solid #ffffff1a;
-  border-radius: var(--pl-radius-xxs);
-  background: linear-gradient(135deg, #ffffff06, #0000 45%), #0a0b0dc2;
-  transition: border-color .18s, background-color .18s;
-}
-.tf-advantage-card:hover { border-color: #ffffff45; }
-.tf-advantage-card:before,
-.tf-advantage-card:after {
-  content: "";
-  position: absolute;
-  width: .62rem;
-  height: .62rem;
-  border-color: #ffffff42;
-  pointer-events: none;
-}
-.tf-advantage-card:before { top: .7rem; left: .7rem; border-top: 1px solid; border-left: 1px solid; }
-.tf-advantage-card:after { right: .7rem; bottom: .7rem; border-right: 1px solid; border-bottom: 1px solid; }
-.tf-advantage-index {
-  font-family: var(--font-mono);
-  font-size: .6rem;
-  letter-spacing: .16em;
-  color: #ffb36bd1;
-}
-.tf-advantage-card h3 { margin: .7rem 0 0; color: #ffffffe6; font-size: .98rem; font-weight: 550; }
-.tf-advantage-card p { margin: .42rem 0 0; color: #ffffff7a; font-size: .78rem; line-height: 1.62; }
-@media (max-width: 1023px) { .tf-advantage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .tf-advantage-grid { grid-template-columns: 1fr; margin-top: 1.9rem; } }
-
-/* eyebrow used above section titles that live outside .tf-section-sidebar */
-.tf-block-overline {
-  display: block;
-  margin: 0 0 1rem;
-  color: #ffffff6b;
-  font-family: var(--font-mono);
-  font-size: .68rem;
-  letter-spacing: .16em;
-  text-transform: uppercase;
-}
+/* XCMP 云管理能力优势带（.tf-advantage-*）已于 2026-09-11 随整个 section 一起
+   删除；XCMP 的表述在 story 区、FAQ、案例卡、页尾 CTA 与 footer 产品列保留。
+   AIRouter 板块的 eyebrow（原 .tf-block-overline）也已随该板块改版删除。 */
 
 /* =========================================================================
    BOSS 运营面板
@@ -287,9 +448,9 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   display: flex;
   flex-direction: column;
   padding: 0;
-  border: 1px solid #ffffff1a;
+  border: 1px solid var(--tf-line);
   border-radius: var(--pl-radius-xs);
-  background: #08090be6;
+  background: var(--tf-plate-glass);
   overflow: hidden;
 }
 .tf-boss-metrics {
@@ -300,13 +461,13 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 }
 .tf-boss-metric {
   padding: .75rem .8rem;
-  border: 1px solid #ffffff1a;
+  border: 1px solid var(--tf-line);
   border-radius: var(--pl-radius-xxs);
   background: #ffffff06;
 }
 .tf-boss-metric b {
   display: block;
-  color: #ffffff6b;
+  color: var(--tf-label);
   font-family: var(--font-mono);
   font-size: .58rem;
   font-weight: 500;
@@ -314,10 +475,10 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   text-transform: uppercase;
 }
 .tf-boss-metric span { display: block; margin-top: .42rem; color: #ffffffe6; font-size: 1.05rem; font-weight: 600; }
-.tf-boss-metric i { display: block; margin-top: .3rem; color: #9fe9ffcc; font-family: var(--font-mono); font-size: .6rem; font-style: normal; }
+.tf-boss-metric i { display: block; margin-top: .3rem; color: var(--tf-rune-80); font-family: var(--font-mono); font-size: .6rem; font-style: normal; }
 .tf-boss-table {
   margin: 1.15rem 1.5rem 0;
-  border: 1px solid #ffffff1a;
+  border: 1px solid var(--tf-line);
   border-radius: var(--pl-radius-xxs);
   background: #0d0e10c7;
   overflow: hidden;
@@ -336,30 +497,30 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 .tf-boss-row.is-head {
   border-top: 0;
   background: #ffffff09;
-  color: #ffffff6b;
+  color: var(--tf-label);
   font-size: .58rem;
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.tf-boss-row .is-ok { color: #8affc1d9; }
-.tf-boss-row .is-live { color: #9fe9ffd9; }
-.tf-boss-row .is-warn { color: #ffb36bd9; }
+.tf-boss-row .is-ok { color: var(--tf-airouter-85); }
+.tf-boss-row .is-live { color: var(--tf-rune-85); }
+.tf-boss-row .is-warn { color: var(--tf-boss-85); }
 .tf-boss-trend {
   margin: 1.15rem 1.5rem 0;
   padding-top: .95rem;
-  border-top: 1px solid #ffffff1a;
+  border-top: 1px solid var(--tf-line);
 }
 .tf-boss-trend-head {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  color: #ffffff6b;
+  color: var(--tf-label);
   font-family: var(--font-mono);
   font-size: .58rem;
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.tf-boss-trend-head span:last-child { color: #8affc1d9; letter-spacing: 0; }
+.tf-boss-trend-head span:last-child { color: var(--tf-airouter-85); letter-spacing: 0; }
 .tf-boss-bars {
   display: flex;
   align-items: flex-end;
@@ -371,20 +532,20 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   flex: 1;
   height: var(--v);
   border-radius: 2px 2px 0 0;
-  background: linear-gradient(180deg, #9fe9ff8c, #9fe9ff1f);
+  background: linear-gradient(180deg, var(--tf-rune-55), var(--tf-rune-12));
 }
-.tf-boss-bars i:last-child { background: linear-gradient(180deg, #ffb36bd9, #ffb36b33); }
+.tf-boss-bars i:last-child { background: linear-gradient(180deg, var(--tf-boss-85), var(--tf-boss-20)); }
 .tf-boss-foot {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   margin-top: auto;
   padding: 1.15rem 1.5rem 1.35rem;
-  color: #ffffff6b;
+  color: var(--tf-label);
   font-family: var(--font-mono);
   font-size: .62rem;
 }
-.tf-boss-foot span:last-child { color: #8affc1d9; }
+.tf-boss-foot span:last-child { color: var(--tf-airouter-85); }
 @media (max-width: 1023px) {
   .tf-boss-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -399,94 +560,146 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 }
 
 /* =========================================================================
-   Rune Harness 云智算内核（规划）
+   Rune Harness 规划板块的样式（.tf-harness-*）已于 2026-09-11 全部删除：
+   该板块从首页移除，这些规则已无元素命中。见 tools/reshape_home.py 的
+   stage_harness()。
    ========================================================================= */
-.tf-harness-head { max-width: 58rem; }
-.tf-harness-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .85rem;
-  margin-top: 2.6rem;
-}
-.tf-harness-phase {
-  position: relative;
-  overflow: hidden;
-  padding: 1.2rem 1.2rem 1.3rem;
-  border: 1px solid #ffffff1a;
-  border-radius: var(--pl-radius-xxs);
-  background: linear-gradient(180deg, #ffffff08, #0000), #0a0b0dc2;
-}
-.tf-harness-phase > span {
-  color: #ffb36bd1;
-  font-family: var(--font-mono);
-  font-size: .6rem;
-  letter-spacing: .18em;
-}
-.tf-harness-phase h3 { margin: .7rem 0 0; color: #ffffffe6; font-size: 1rem; font-weight: 550; }
-.tf-harness-phase p { margin: .45rem 0 0; color: #ffffff7a; font-size: .78rem; line-height: 1.62; }
-.tf-harness-phase ul {
-  display: grid;
-  gap: .38rem;
-  margin: .95rem 0 0;
-  padding: .75rem 0 0;
-  border-top: 1px solid #ffffff14;
-  list-style: none;
-}
-.tf-harness-phase li {
-  display: flex;
-  gap: .45rem;
-  color: #ffffff8c;
-  font-family: var(--font-mono);
-  font-size: .62rem;
-  line-height: 1.5;
-}
-.tf-harness-phase li:before { content: "›"; color: #9fe9ffb3; }
-.tf-harness-flow {
-  margin-top: 1.5rem;
-  border: 1px solid #ffffff1a;
-  border-radius: var(--pl-radius-xxs);
-  background: #0d0e10c2;
-  overflow: hidden;
-}
-.tf-harness-flow-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: .75rem;
-  padding: .85rem 1.15rem;
-  border-bottom: 1px solid #ffffff1a;
-  background: #ffffff06;
-}
-.tf-harness-flow-bar p {
+
+/* --------------------------------------------------------------------------
+   AIRouter 板块对齐 Rune / BOSS 的 tf-section-* 排版（2026-09-11）
+   外壳与左栏已由 tools/reshape_home.py 换成同款结构；这里只补一件事：
+   代码面板搬进 .tf-section-split 之后的拉伸与描边。
+   左栏那条链接现在和 BOSS 一样是裸 .tf-section-link，原来的两列 flex 容器
+   （.tf-section-actions）已随第二条链接一起删除。
+   vendor.css 里的 .tf-managed-api-* 规则已无元素命中，保持不动。
+   -------------------------------------------------------------------------- */
+.tf-section-split > .tf-managed-api-code-panel {
+  align-self: stretch;
   margin: 0;
-  color: #ffd9b0e6;
-  font-family: var(--font-mono);
-  font-size: .68rem;
+  padding: clamp(1rem, 1.8vw, 1.35rem);
+  background: linear-gradient(#ffffff13, #ffffff07), var(--tf-plate-glass);
+  border: 1px solid var(--tf-line);
+  border-radius: var(--pl-radius-xs);
+  box-shadow: var(--pl-shadow-panel);
 }
-.tf-harness-flow-bar span { color: #ffffff6b; font-family: var(--font-mono); font-size: .6rem; }
-.tf-harness-flow-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.tf-harness-flow-step { padding: 1rem 1.1rem 1.15rem; border-left: 1px solid #ffffff14; }
-.tf-harness-flow-step:first-child { border-left: 0; }
-.tf-harness-flow-step b {
-  display: block;
-  color: #9fe9ffb3;
-  font-family: var(--font-mono);
-  font-size: .58rem;
-  font-weight: 500;
-  letter-spacing: .14em;
+@media (max-width: 767px) {
+  .tf-section-split > .tf-managed-api-code-panel { padding: 1rem; }
 }
-.tf-harness-flow-step strong { display: block; margin-top: .5rem; color: #ffffffe0; font-size: .88rem; font-weight: 600; }
-.tf-harness-flow-step p { margin: .35rem 0 0; color: #ffffff7a; font-size: .72rem; line-height: 1.5; }
-.tf-harness-flow-step span { display: block; margin-top: .55rem; color: #ffffff52; font-family: var(--font-mono); font-size: .58rem; line-height: 1.5; }
-@media (max-width: 1023px) {
-  .tf-harness-grid { grid-template-columns: 1fr; }
-  .tf-harness-flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tf-harness-flow-step { border-left: 0; border-top: 1px solid #ffffff14; }
-  .tf-harness-flow-step:first-child { border-top: 0; }
+
+/* --------------------------------------------------------------------------
+   首页博客卡封面换源后的处理档位（2026-09-11）
+   三张卡的封面原先是为这个容器**专门生成**的近黑底亮线稿（tools/gen_blog.py，
+   文件头写明了缘由：vendor 那档 `opacity:.38 + grayscale + brightness(1.1) +
+   scale(1.3)` 会把中间调的图压成一片看不出结构的灰）。
+   现在封面改为从内容源读，与 /blog 详情页共用同一张图（实拍照片与品牌图），
+   线稿档就不再合适：照片的中频会被抬亮成灰雾，白底品牌图会整块发灰。
+   按「照片」重新定档——压低而不是抬亮，让封面沉成暗纹理；放大倍率交给
+   .is-wide-art 那一档（scale 1.04）处理。
+   若要退回线稿档，删掉下面两条属性即可。
+   -------------------------------------------------------------------------- */
+.tf-blog-overview .tf-blog-image-frame img {
+  opacity: .5;
+  filter: grayscale() contrast(1.05) brightness(.5);
 }
-@media (max-width: 640px) {
-  .tf-harness-flow-steps { grid-template-columns: 1fr; }
+
+/* --------------------------------------------------------------------------
+   导航 hover 动效的时长（2026-09-11）
+
+   顶部那排按钮原来偏快：菜单项的颜色过渡走 --motion-fast（.18s），
+   「预约演示」按钮走 --transition-control（.4s）；两处下拉里的选项更彻底 ——
+   vendor 在 .tf-nav-product-menu / .tf-nav-company-dropdown 作用域里写了
+   `transition:none`（配套 `transform:none`），所以鼠标划过去时背景与边框是
+   **瞬变**，一点过渡都没有。
+
+   这里把这一族统一到一个变量上。选 .45s：比原来的 .18s 明显慢，又没到
+   --motion-slow（.68s）那种「像卡了一下」的程度。要整体调快慢只改这一行。
+
+   曲线一并从 --motion-ease-standard（cubic-bezier(.4,0,.2,1)，两头对称）
+   换成 --motion-ease-out（cubic-bezier(.22,1,.36,1)，起步缓、收尾快）——
+   时长拉长后，对称曲线在中段会「停」一下；ease-out 收得住，慢而不拖。
+   两个变量是配着改的，只调时长不管曲线会显得迟滞。
+
+   作用域选择器与 vendor 里那几条**同形**（custom.css 在 vendor.css 之后加载，
+   同特异性即胜出），所以既不需要 !important，也不用动 vendor.css。
+   -------------------------------------------------------------------------- */
+:root {
+  --tf-nav-hover: .45s;
+}
+
+/* 菜单项：首页 / 解决方案 / 价格与服务 / 文档中心 / 联系销售，以及两个下拉
+   触发器（产品 / 关于我们）—— 它们都带 .tf-nav-menu-link。 */
+.tf-nav-menu-link {
+  transition: color var(--tf-nav-hover) var(--motion-ease-out),
+              opacity var(--tf-nav-hover) var(--motion-ease-out);
+}
+.tf-nav-product-trigger svg {
+  transition: transform var(--tf-nav-hover) var(--motion-ease-in-out),
+              color var(--tf-nav-hover) var(--motion-ease-out);
+}
+
+/* 「预约演示」按钮：.tf-button 走 --transition-control（.4s）。这里只改时长，
+   不动 vendor 的 transform:scale(.98) —— 顶部这排按钮的按下感就是「微缩」，
+   再加位移会跟 :where(...) 里那条规则打架。 */
+.tf-nav-frame .tf-nav-console-trigger {
+  transition: border-color var(--tf-nav-hover) var(--motion-ease-out),
+              background-color var(--tf-nav-hover) var(--motion-ease-out),
+              color var(--tf-nav-hover) var(--motion-ease-out),
+              transform var(--tf-nav-hover) var(--motion-ease-out);
+}
+.tf-nav-console-trigger svg {
+  transition: transform var(--tf-nav-hover) var(--motion-ease-out);
+}
+
+/* 下拉选项：补回过渡（vendor 里被压成 none），并给一点位移 ——
+   vendor 的通用 .tf-nav-dropdown-item:hover 本来就是 translate(.25rem)，
+   这两个作用域把它压掉了。这里取 .2rem，比通用档稍收：两处下拉是 270px
+   定宽 + 20px 图标对齐，位移再大右侧说明文字会贴边。 */
+.tf-nav-product-menu .tf-nav-dropdown-item,
+.tf-nav-company-dropdown .tf-nav-dropdown-item {
+  transition: background-color var(--tf-nav-hover) var(--motion-ease-out),
+              border-color var(--tf-nav-hover) var(--motion-ease-out),
+              border-radius var(--tf-nav-hover) var(--motion-ease-out),
+              color var(--tf-nav-hover) var(--motion-ease-out),
+              transform var(--tf-nav-hover) var(--motion-ease-out);
+}
+.tf-nav-product-menu .tf-nav-dropdown-item:hover,
+.tf-nav-company-dropdown .tf-nav-dropdown-item:hover {
+  transform: translate(.2rem);
+}
+
+/* 「预约演示」弹层里的选项（四个控制台入口）：原本是 --motion-control（.4s），
+   跟上面几处对齐；右侧那个小箭头的位移也一起。 */
+.tf-nav-console-item {
+  transition: border-color var(--tf-nav-hover) var(--motion-ease-out),
+              background-color var(--tf-nav-hover) var(--motion-ease-out),
+              color var(--tf-nav-hover) var(--motion-ease-out),
+              transform var(--tf-nav-hover) var(--motion-ease-out);
+}
+.tf-nav-console-item > svg {
+  transition: transform var(--tf-nav-hover) var(--motion-ease-out);
+}
+
+/* 两块下拉面板本身的淡入也跟着走同一档：原来 --motion-base（.32s）比里面的
+   选项还快，悬停时会出现「面板已经到位、选项还在动」的错位感。
+   注意产品下拉那一条要**带上作用域**：vendor 里除了 `.tf-nav-dropdown`，
+   还有一条 `.tf-nav-product-menu .tf-nav-dropdown{transition:none}`（.tf-nav-product-menu
+   里那两个下拉是换成 #111 深色面板的那版，原本连面板都是瞬显），
+   只写单类名压不过它。 */
+.tf-nav-dropdown,
+.tf-nav-console-dropdown,
+.tf-nav-product-menu .tf-nav-dropdown,
+.tf-nav-company-dropdown {
+  transition: opacity var(--tf-nav-hover) var(--motion-ease-out),
+              transform var(--tf-nav-hover) var(--motion-ease-out),
+              visibility var(--tf-nav-hover) var(--motion-ease-out);
+}
+
+/* 开了「减弱动态效果」的用户：把时长归零（用 1ms 而不是 none —— 语义仍是
+   「有过渡、只是瞬时」，将来谁在 transitionend 上挂了逻辑也不会突然收不到）。
+   文字乱码那一半在 main.js 里，那里直接不绑事件；两处要一起，
+   只做这边的话乱码照跳。 */
+@media (prefers-reduced-motion: reduce) {
+  :root { --tf-nav-hover: 1ms; }
 }
 
 ::selection { background: rgba(125, 243, 240, .28); }

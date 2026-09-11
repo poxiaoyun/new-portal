@@ -131,14 +131,28 @@ g.rect(3, 9, 1, 1, GRAY)
 save('icon-gate.svg', g.svg())
 
 # --- 6. brand mark (hub) ---------------------------------------------------
+# 2026-09-11: the two bars are **top-aligned**, same convention as the nav
+# lockup in §10. The short bar used to sit y 14..44 -- 8 units below the tall
+# bar's top (y 6), which read as "floating in the middle" of the tall one. Its
+# height (30) is unchanged; only its top moved 14 -> 6.
+#
+# With both marks aligned, the nav lockup is back to being an exact 0.5x scale
+# of this file in bar geometry (48/30 -> 24/15, offset 0 -> 0, top 6 -> 2).
+# Keep it that way: if you move a bar here, move the matching one in §10.
+#
+# The mark is used in three places -- favicon, the hero hub
+# (`.tf-icon-hero.center img`) and the Harness band (`.tf-control-harness-mark
+# img`) -- all as a square <img> with `object-fit: contain` on a square 60x60
+# canvas. Nothing crops, and the tall bar still spans y 6..54, so moving the
+# short bar cannot shift any layout.
 mark = '''<svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
 <rect x="10" y="6" width="15" height="48" rx="7.5" fill="url(#mk-teal)"/>
-<rect x="31" y="14" width="15" height="30" rx="7.5" fill="url(#mk-violet)"/>
+<rect x="31" y="6" width="15" height="30" rx="7.5" fill="url(#mk-violet)"/>
 <defs>
 <linearGradient id="mk-teal" x1="10" y1="6" x2="25" y2="54" gradientUnits="userSpaceOnUse">
 <stop stop-color="#7DF3F0"/><stop offset="1" stop-color="#2CC7D8"/>
 </linearGradient>
-<linearGradient id="mk-violet" x1="31" y1="14" x2="46" y2="44" gradientUnits="userSpaceOnUse">
+<linearGradient id="mk-violet" x1="31" y1="6" x2="46" y2="36" gradientUnits="userSpaceOnUse">
 <stop stop-color="#8E7BFF"/><stop offset="1" stop-color="#5A46E0"/>
 </linearGradient>
 </defs></svg>'''
@@ -167,16 +181,38 @@ g.rect(7, 7, 2, 5, ON)
 save('icon-info.svg', g.svg())
 
 # --- 10. wordmark logo (nav) ----------------------------------------------
+# The mark is mono on purpose: it has to read as the same light glyph as the
+# hero hub, which is assets/img/icon-mark.svg run through custom.css's
+#   .tf-icon-hero.center img { filter: grayscale() contrast(1.12) brightness(1.72) }
+# on #111214. So the stops below are that filter's exact output for the brand
+# gradient, computed in sRGB, one channel at a time:
+#   #7DF3F0 / #2CC7D8 (teal)   -> both clamp to #FFFFFF
+#   #8E7BFF -> #EDEDED,  #5A46E0 -> #8A8A8A  (violet, dropped to a grey ramp)
+# Baked in rather than applied as a CSS filter on the <img> so the white
+# wordmark keeps its crisp antihaliasing -- brightness() runs over the whole
+# element, so it would thicken every glyph edge. If the hub filter changes,
+# re-derive these two stops; that is the only thing linking the two files.
+# The canvas stays 150x28 even though the wordmark is 5 glyphs now (~x114 at
+# 17px + .4 tracking), so the nav layout does not move.
+#
+# 2026-09-11: the two bars are **top-aligned**. They used to sit y 2..26 (tall
+# bar) and y 6..21 (short bar) -- the short one hung 4 units lower. The user
+# asked for both tops to line up, so the short bar moved 6 -> 2. Do **not**
+# "fix" it back: the previous version read as the short bar floating in the
+# middle of the tall one rather than as a pair of bars sharing a baseline.
+#
+# §6 was aligned the same day, so this lockup is again an exact 0.5x scale of
+# assets/img/icon-mark.svg in bar geometry (tall 48->24, short 30->15, tops
+# 6->2). The two files are meant to move together -- see §6's note.
+# The short bar keeps its own height (15); only its top moved.
 logo = '''<svg width="150" height="28" viewBox="0 0 150 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="1" y="2" width="7.6" height="24" rx="3.8" fill="url(#lg-teal)"/>
-<rect x="11.4" y="6" width="7.6" height="15" rx="3.8" fill="url(#lg-violet)"/>
+<rect x="1" y="2" width="7.6" height="24" rx="3.8" fill="#ffffff"/>
+<rect x="11.4" y="2" width="7.6" height="15" rx="3.8" fill="url(#lg-mono)"/>
 <text x="27" y="20.4" font-family="Geist, Inter, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif"
- font-size="17" font-weight="600" letter-spacing="0.4" fill="#ffffff">晓石云</text>
+ font-size="17" font-weight="600" letter-spacing="0.4" fill="#ffffff">破晓石科技</text>
 <defs>
-<linearGradient id="lg-teal" x1="1" y1="2" x2="8.6" y2="26" gradientUnits="userSpaceOnUse">
-<stop stop-color="#7DF3F0"/><stop offset="1" stop-color="#2CC7D8"/></linearGradient>
-<linearGradient id="lg-violet" x1="11.4" y1="6" x2="19" y2="21" gradientUnits="userSpaceOnUse">
-<stop stop-color="#8E7BFF"/><stop offset="1" stop-color="#5A46E0"/></linearGradient>
+<linearGradient id="lg-mono" x1="11.4" y1="2" x2="19" y2="17" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EDEDED"/><stop offset="1" stop-color="#8A8A8A"/></linearGradient>
 </defs></svg>'''
 save('logo.svg', logo)
 print('done')

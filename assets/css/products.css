@@ -1,0 +1,231 @@
+/* =========================================================================
+   产品子页（/products/rune/ · /products/moha/ · /products/ai-router/ · /products/boss/）
+   -------------------------------------------------------------------------
+   版式语言取自上游 pipellm.ai/runtime 那一页：左侧文案 + 右侧深色控制台面板，
+   mono 小标签。**组件不是新写的**：
+
+     .tf-runtime-console / -bar / -dots / -status / -label / -console-footer
+       -> 来自 vendor.css 的 tf-runtime-* 组件族（42 个类）
+
+     .tf-section / -inner / -frame / .tf-panel / .tf-overline / .tf-brand-action
+     .tf-faq-section-divider / -inner / .tf-faq-code-divider / .tf-contact-cta-*
+       -> 同样来自 vendor.css
+
+   本文件只补两件 vendor 里没有的东西：
+     1. 页首的双栏与内边距（垂直间距**只能写在这里**，Tailwind 的 pt-4/pb-16
+        在 vendor.css 里不存在，写了等于没写 —— 见 about.css 里那段教训）
+     2. 页首右侧预览面板的内层（行、终端行、编号步骤）
+
+   三轮删板块后本文件跟着瘦身（样式表里留着没人引用的规则，下一个人会以为那些类还
+   在用）：
+     2026-09-11 晚（九）删 .tf-products-boundary* / .tf-products-sibling* / 能力卡图标槽
+     2026-09-11 晚（十）删 .tf-products-note（那是「一次全过程」全宽 console 的注脚，
+       那一段删掉后它在页面上没有引用了）
+     2026-09-11 晚（十一）删 .tf-products-cta-links（收尾 CTA 整段按用户要求删除后
+       就没有引用了 —— 它是这一段唯一一条写在**本文件**里的规则）
+     2026-09-11 晚（十二）删 .tf-product-hero-badge / -badge i（页首徽标按用户要求
+       删除。这次删的是**页首内部的元素**，不是整段，所以连带面小得多：markup 两行 +
+       数据字段 + 这两条规则 + 守卫；页首与预览面板一行没动）
+   注意 .tf-runtime-* 里与「请求 / 选路双栏」有关的那几个（-showcase / -request /
+   -route / -steps / -step / -protocols / -result / -route-meta / -route-trace /
+   -story）本就不在本文件里 —— 它们属于 vendor.css，删板块不需要动 vendor。
+   同理 .tf-contact-cta-* 全套（structure / shell / card / primary / secondary /
+   console）是 vendor 的通用组件，首页与 /about 仍在用，晚（十一）只让**产品页**不再
+   引用它们，一行 vendor 都没动。
+
+   主题色：生成器在**页根容器** `.tf-products-page` 上写一次
+   `style="--tf-product-accent: var(--tf-rune);"`，下面一律取
+   var(--tf-product-accent)。四个色值就是 custom.css :root 里的
+   --tf-rune / --tf-moha / --tf-airouter / --tf-boss（也正是 tf-runtime 组件
+   轨道渐变用的那四个），所以产品页之间只有强调色不同。
+   ========================================================================= */
+
+/* 页根容器。它唯一要做的事就是给整页定强调色的默认值 —— 各段的内联 style 里
+   只有 --tf-motion-order，颜色靠这条继承下来。所以它**不是**空壳：去掉这条规则，
+   页内所有 var(--tf-product-accent) 都会取到空值（页首光晕、预览面板的终端提示符与
+   编号步骤一起失效），而 tools/qa/classes.py 也会因为这个类没有规则而报幽灵类。
+   （姊妹产品卡曾在每张卡上反向覆盖这个变量；那一段已按用户要求删除，现在全页只有
+   这一个来源，守卫也按 1 处咬住。） */
+.tf-products-page {
+  --tf-product-accent: var(--tf-rune);
+}
+
+/* ----------------------------------------------------------------- 页首 */
+.tf-product-hero {
+  position: relative;
+  overflow: hidden;
+  /* 顶栏 fixed + 116px 占位；这里再给内容自己的呼吸位（clamp 连续变化，
+     不依赖断点，也不会像别的写法那样「某一档突然跳一下」）。 */
+  padding-top: clamp(2.4rem, 4.6vw, 4rem);
+  padding-bottom: clamp(3.4rem, 5.4vw, 5rem);
+}
+/* 页首光晕：取产品强调色。绝对定位 + 负 top，改 padding 不会让它错位。 */
+.tf-product-hero:before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  top: -12rem;
+  width: 46rem;
+  height: 30rem;
+  pointer-events: none;
+  background: radial-gradient(closest-side,
+              color-mix(in srgb, var(--tf-product-accent, #9fe9ff) 16%, transparent),
+              transparent 72%);
+}
+.tf-product-hero-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 4.5rem);
+}
+.tf-product-hero-copy { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* 页首徽标胶囊 .tf-product-hero-badge 曾在这里（mono 大写小胶囊 + 左侧强调色圆点，
+   上游 runtime 页左上角那个 chip 的位置）。晚（十二）按用户要求删除 —— 类与规则
+   一起清掉，markup 里那层只为它服务的 `<div class="mt-6">` 包装也一并去掉。
+   逐字原文在 docs/archive/products-deleted-sections-2026-09-11.md。
+   注意 `--tf-product-accent` 的继承链没因此失守：页首光晕（`:before` 的 color-mix）、
+   预览面板的终端提示符与编号步骤都还在用它。 */
+
+.tf-product-hero-title {
+  margin: 1.35rem 0 0;
+  max-width: 34rem;
+  color: #fff;
+  font-size: clamp(2.1rem, 3.9vw, 3.2rem);
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+}
+.tf-product-hero-lede {
+  margin: 1.15rem 0 0;
+  max-width: 34rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+  line-height: 1.82;
+}
+.tf-product-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.9rem;
+}
+.tf-product-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+  margin-top: 1.6rem;
+  color: rgba(255, 255, 255, 0.42);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+}
+.tf-product-hero-meta i {
+  width: 1px;
+  height: 0.7rem;
+  background: var(--tf-line-strong);
+}
+
+/* ------------------------------------------------- 页首右侧：控制台预览 */
+/* 外壳本身是 .tf-runtime-console（vendor）：深底板 + 网格纹理 + 顶部条 + 底部三段 */
+.tf-product-preview { align-self: center; }
+.tf-product-preview-body {
+  position: relative;
+  z-index: 1;
+  padding: clamp(1.35rem, 2.6vw, 1.9rem) clamp(1.25rem, 2.6vw, 1.85rem);
+  border-bottom: 1px solid var(--tf-line);
+}
+.tf-product-preview-rows {
+  margin: 0.9rem 0 0;
+  display: grid;
+  gap: 0;
+}
+.tf-product-preview-rows > div {
+  display: grid;
+  grid-template-columns: minmax(0, 7.4rem) minmax(0, 1fr);
+  gap: 0.9rem;
+  padding: 0.62rem 0;
+  border-top: 1px solid var(--tf-line);
+}
+.tf-product-preview-rows > div:first-child { border-top: 0; }
+.tf-product-preview-rows dt {
+  color: rgba(255, 255, 255, 0.44);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+.tf-product-preview-rows dd {
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.86);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 终端行：mono，左边一个强调色提示符 */
+.tf-product-preview-line {
+  margin: 1.25rem 0 0;
+  padding: 0.78rem 0.95rem;
+  border: 1px solid var(--tf-line);
+  border-radius: var(--pl-radius-xxs);
+  background: #0000008f;
+  color: rgba(255, 255, 255, 0.84);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+}
+.tf-product-preview-line i {
+  margin-right: 0.5rem;
+  color: var(--tf-product-accent, #9fe9ff);
+  font-style: normal;
+}
+/* 编号步骤：0 1 / 0 2 / 0 3 —— 上游 runtime 页右栏那三个小方块 */
+.tf-product-preview-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tf-product-preview-steps li {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+.tf-product-preview-steps b {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--tf-product-accent, #9fe9ff);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+}
+.tf-product-preview-note {
+  margin: 1.1rem 0 0;
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 0.68rem;
+  line-height: 1.6;
+}
+
+/* 收尾 CTA 的链接组 .tf-products-cta-links 曾在这里（与 about.css 的
+   .tf-about-cta-links 同形，只是换了前缀）。晚（十一）收尾 CTA 整段删除，它没有
+   引用者了，规则块随之删除 —— 逐字原文在 docs/CODE-REVIEW-2026-09-11.md §17。 */
+
+/* ------------------------------------------------------------------ 响应式 */
+@media (max-width: 1024px) {
+  .tf-product-hero-shell { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .tf-product-preview-steps { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+  .tf-product-preview-rows > div { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; }
+  .tf-product-preview-rows dd { white-space: normal; }
+}

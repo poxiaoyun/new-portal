@@ -1,11 +1,9 @@
 <svg width="150" height="28" viewBox="0 0 150 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="1" y="2" width="7.6" height="24" rx="3.8" fill="url(#lg-teal)"/>
-<rect x="11.4" y="6" width="7.6" height="15" rx="3.8" fill="url(#lg-violet)"/>
+<rect x="1" y="2" width="7.6" height="24" rx="3.8" fill="#ffffff"/>
+<rect x="11.4" y="2" width="7.6" height="15" rx="3.8" fill="url(#lg-mono)"/>
 <text x="27" y="20.4" font-family="Geist, Inter, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif"
- font-size="17" font-weight="600" letter-spacing="0.4" fill="#ffffff">晓石云</text>
+ font-size="17" font-weight="600" letter-spacing="0.4" fill="#ffffff">破晓石科技</text>
 <defs>
-<linearGradient id="lg-teal" x1="1" y1="2" x2="8.6" y2="26" gradientUnits="userSpaceOnUse">
-<stop stop-color="#7DF3F0"/><stop offset="1" stop-color="#2CC7D8"/></linearGradient>
-<linearGradient id="lg-violet" x1="11.4" y1="6" x2="19" y2="21" gradientUnits="userSpaceOnUse">
-<stop stop-color="#8E7BFF"/><stop offset="1" stop-color="#5A46E0"/></linearGradient>
+<linearGradient id="lg-mono" x1="11.4" y1="2" x2="19" y2="17" gradientUnits="userSpaceOnUse">
+<stop stop-color="#EDEDED"/><stop offset="1" stop-color="#8A8A8A"/></linearGradient>
 </defs></svg>
