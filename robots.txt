@@ -1,0 +1,12 @@
+# 破晓石科技官网 · https://www.poxiaoshi.cn
+#
+# 整站都对外开放：没有登录墙、没有付费墙、也没有需要屏蔽的目录，所以这里只有
+# 一条 Allow。**刻意不写 Disallow** —— 写了就得维护一份「哪些不该抓」的清单，
+# 而这份站点的每一页都是给人看的。
+#
+# 本文件由 tools/build_seo.py 生成，别手改（重跑会覆盖）。
+
+User-agent: *
+Allow: /
+
+Sitemap: https://www.poxiaoshi.cn/sitemap.xml

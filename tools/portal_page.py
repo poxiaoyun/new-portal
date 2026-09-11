@@ -30,11 +30,23 @@
 """
 
 import hashlib
+import inspect
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import seo  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOME = os.path.join(ROOT, 'index.html')
+
+# 允许调用方通过 derive(seo_extra={…}) 传的键 = seo_block() 除 title/description/url
+# 之外的全部形参。**从签名现取**而不是手抄一份：手抄的那份一定会在 seo_block
+# 加参数之后漂掉，而漂掉的后果是「调用方传了、这里静默忽略」—— SEO 标签少一条
+# 页面照常渲染，谁都不会发现。
+SEO_EXTRA_KEYS = frozenset(inspect.signature(seo.seo_block).parameters) - {
+    'title', 'description', 'url'}
 
 # 首页 nav 里「关于我们」这一组（`公司简介` / `公司动态` 都在它的下拉里）。
 # 用 data 属性定位而不是文本，避免上游改文案时锚点静默失效。
@@ -217,6 +229,11 @@ def chrome_fingerprint(doc, extra_css, ctx, depth=1):
     head = normalize_assets(doc[doc.find('<head'):doc.find('</head>')], depth)
     head = re.sub(r'<title>[^<]*</title>', '<title/>', head, count=1)
     head = re.sub(r'(<meta name="description" content=")[^"]*(")', r'\1\2', head, count=1)
+    # 整块 SEO 标签剥掉。它是**逐页不同**的那一半（canonical / og:url / og:title /
+    # 结构化数据），留着这条不变量就会被正常的逐页差异判成「站芯漂移」。
+    # 剥掉之后比对的才是真正的站芯，而「这块在不在、内容对不对」由
+    # seo_guard()（首页）与 qa/seo.py（每一页）各自负责。
+    head = re.sub(seo.SEO_BLOCK_RE, '', head)
     head = head.replace('\n<link rel="stylesheet" href="assets/css/%s">' % extra_css, '')
     parts.append(head)
     return parts
@@ -228,7 +245,8 @@ def head_link_anchor():
 
 
 def derive(ctx, out_rel, title, description, extra_css, main_markup,
-           active_group=COMPANY_NAV_GROUP, main_label=None, nav_label=None, depth=1):
+           active_group=COMPANY_NAV_GROUP, main_label=None, nav_label=None, depth=1,
+           seo_extra=None):
     """派生一个内容页，返回 (产物文本, 首页文本, 首页 md5)。
 
     title / description 写进 head；extra_css 形如 'blog.css'（产物里会按 depth
@@ -237,7 +255,19 @@ def derive(ctx, out_rel, title, description, extra_css, main_markup,
 
     active_group 是「导航里哪一组该亮」。传 None 表示这一页不归属任何组
     （404 页），此时只摘掉首页的选中态 —— 见下面「导航选中态」那段。
+
+    out_rel 决定这一页的 canonical（`about/index.html` -> `…/about/`），
+    所以**页面挪位置时 canonical 自动跟着走**，不需要谁记得去改一处 URL。
+
+    seo_extra 是交给 seo.seo_block() 的其余入参（kind / published / image /
+    noindex / section / breadcrumb_trail / og_title / posts / …），键名按
+    seo_block 的签名校验，写错会**报错**而不是静默忽略 —— 见 SEO_EXTRA_KEYS。
     """
+    seo_extra = dict(seo_extra or {})
+    unknown = sorted(set(seo_extra) - SEO_EXTRA_KEYS)
+    if unknown:
+        raise SystemExit('derive(seo_extra=…) 里有 seo_block 不认识的键: %s'
+                         % ', '.join(unknown))
     if not os.path.exists(HOME):
         raise SystemExit('missing %s — 先跑 tools/reshape_home.py 生成首页' % HOME)
     prefix = asset_prefix(depth)
@@ -255,6 +285,25 @@ def derive(ctx, out_rel, title, description, extra_css, main_markup,
         ctx.miss.append('head rewrite did not apply')
     else:
         ctx.applied['head title/description'] = 1
+
+    # ---------------------------------------------------------------- SEO 块
+    # 认标记整块替换。首页那一块由 reshape_home.stage_seo() 产出，这里换成
+    # 本页的一份 —— canonical 由 out_rel 推、其余按 seo_extra。
+    #
+    # 首页缺这一块必须报错：那说明 reshape_home.py 的 stage_seo() 没跑或被改名，
+    # 下面这条替换会找不到标记，13 个页面一起静默丢掉全部 SEO 标签。
+    if len(seo.SEO_BLOCK_RE.findall(home)) != 1:
+        ctx.miss.append('index.html does not carry exactly one SEO block — '
+                        'reshape_home.py 的 stage_seo() 没跑或标记被改名了')
+    block = seo.seo_block(title=title, description=description,
+                          url=seo.page_url(out_rel), **seo_extra)
+    # 替换值用 lambda 而不是字符串：JSON-LD 里的 `\u003c` 会被 re.sub 当成
+    # 转义序列解析而抛「bad escape \u」。
+    doc, n = seo.SEO_BLOCK_RE.subn(lambda _m: block, doc, count=1)
+    if n != 1:
+        ctx.miss.append('SEO block replacement hit %d times (want 1)' % n)
+    else:
+        ctx.applied['head seo block (%s)' % seo_extra.get('kind', 'webpage')] = 1
 
     anchor = head_link_anchor()
     if anchor not in doc:
@@ -331,6 +380,20 @@ def derive(ctx, out_rel, title, description, extra_css, main_markup,
         ctx.miss.append('main wrapper lost')
     if '</main>' not in doc:
         ctx.miss.append('</main> lost')
+    # SEO 块：替换后必须恰好一块，且 canonical 指向本页自己的 URL。
+    # 这两条只看「这一页自己」，跨页的一致性（唯一性、sitemap 覆盖）由
+    # qa/seo.py 在全部产物上查。
+    if doc.count(seo.SEO_START) != 1 or doc.count(seo.SEO_END) != 1:
+        ctx.miss.append('SEO block count after rewrite: %d start / %d end'
+                        % (doc.count(seo.SEO_START), doc.count(seo.SEO_END)))
+    self_url = seo.page_url(out_rel)
+    if self_url:
+        if '<link rel="canonical" href="%s">' % self_url not in doc:
+            ctx.miss.append('canonical does not point at %s' % self_url)
+    elif 'rel="canonical"' in doc:
+        # 404 页没有「自己的正式地址」，挂 canonical 等于把爬虫往 404 上引。
+        ctx.miss.append('%s has no URL of its own — it must not carry a canonical'
+                        % out_rel)
     # 标签栈平衡（只管结构标签，忽略 void）
     for tag in ('div', 'section', 'li', 'ul', 'ol', 'main', 'h2', 'h3', 'p'):
         opens = len(re.findall(r'<%s[\s>]' % tag, doc))

@@ -6,6 +6,12 @@
 # 只在 CI 里临时生成，不入库。
 dist/
 
+# 本地临时产物。tools/qa/page.mjs 的 --shots 出图、tools/gen_og.py 渲染用的
+# 中间 HTML 都落在这里。它同时出现在两处「不该上线」的名单里
+# （qa/links.py 的 SKIP_DIRS、workflow 的 DENY），但一直没被 gitignore ——
+# 于是那些文件会以未跟踪状态挂在 git status 上，容易被 git add . 带进提交。
+tmp/
+
 # Python 字节码。生成器是「被 import 的模块」（portal_page / mdrender），
 # 所以一跑就会在 tools/__pycache__ 留下 .pyc —— 之前没忽略，`git add .`
 # 会把它们一起提交进去（2026-09-11 审查发现）。

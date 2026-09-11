@@ -39,6 +39,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mdrender  # noqa: E402
+import seo  # noqa: E402
 from portal_page import (ARROW, ARROW_S, Ctx, derive, esc, ext,  # noqa: E402
                          finish_many, match_close, upstream_brand)
 
@@ -321,6 +322,12 @@ def main():
         main_label='main body -> 公司动态列表',
         nav_label='nav active state -> 关于我们',
         depth=1,
+        seo_extra=dict(
+            kind='blog',
+            # Blog 实体里挂上每篇的 @id 引用（只引 url + 标题，不复述摘要 ——
+            # 列表页不该替详情页说话）。顺序跟着 posts：列表页也是这个顺序。
+            posts=[(seo.abs_url(p['href']), p['title']) for p in posts],
+        ),
     )
 
     # 列表页守卫：条数与内容源一致，且每条三处链接都指向**本地**详情页
@@ -384,6 +391,22 @@ def main():
             main_label='main body -> %s' % post['slug'],
             nav_label='nav active state -> 关于我们',
             depth=2,
+            seo_extra=dict(
+                kind='article',
+                # 内容源里的日期就是「内容日期」：它同时进 datePublished、
+                # og:article:published_time 与 sitemap 的 lastmod 三处 ——
+                # 所以三者必然一致，不会出现「页面上写 3 月、sitemap 说今天」。
+                published=post['date'],
+                section=post['tag'],
+                image=seo.og_image('blog', post['slug']),
+                # 面包屑：页面上真有一条层级线索 —— hero 里那颗分类胶囊就指回
+                # /blog（见 detail_hero）。没有可见层级的地方不要编。
+                breadcrumb_trail=[
+                    ('首页', seo.SITE_URL + '/'),
+                    (HEADING, seo.abs_url('/blog/')),
+                    (post['title'], None),
+                ],
+            ),
         )
         slug = post['slug']
 

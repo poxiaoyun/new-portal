@@ -7,7 +7,8 @@
       ├─ blog/…             <- build_blog.py
       ├─ contact/index.html <- build_contact.py
       ├─ products/*/index.html <- build_products.py
-      └─ 404.html           <- build_404.py    （全站兜底页 + 旧前缀兼容层）
+      ├─ 404.html           <- build_404.py    （全站兜底页 + 旧前缀兼容层）
+      └─ robots.txt / sitemap.xml <- build_seo.py（清点上面全部页面）
 
 后五个都用 portal_page.derive() 从**已定稿的 index.html** 取站芯（head / nav /
 移动抽屉 / footer），并且 derive() 会在写盘前断言 index.html 一个字节都没被改动。
@@ -16,9 +17,17 @@
 blog / contact 深一层，derive(depth=2) 负责把相对资产路径加够两层；404.html 在
 站点根，depth=0。
 
-凭据在构建期从环境变量注入（GitHub Secret -> CI env，见 build_contact.py 顶部）：
+build_seo.py 排在最后：它要清点**全部**页面（走 qa/links.py 的 discover_pages），
+早于任何一个页面生成器就会漏页。
+
+凭据与站点身份在构建期从环境变量注入（GitHub Secret -> CI env，见 build_contact.py
+与 seo.py 顶部）：
     WEB3FORMS_ACCESS_KEY    未设置时 form 用占位符，只 WARN 不失败
     TENCENT_MAP_KEY         未设置时地图退到代理模式，只 WARN 不失败
+    SITE_URL                canonical / og:url / sitemap 的规范主机，默认线上真值
+    GOOGLE_SITE_VERIFICATION / BAIDU_SITE_VERIFICATION / BING_SITE_VERIFICATION
+                            三家站长平台的归属验证码，未设置则对应 meta 整条不输出
+                            （编一个假值会让控制台挂着一个永远验不过的校验，更坏）
 本地想用真值预览，写进仓库根 .env.local（已 gitignore）。
 
 用法：
@@ -33,14 +42,15 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-# 顺序即依赖：第一个产站芯，其余五个消费它。
+# 顺序即依赖：第一个产站芯，中间五个消费它，最后一个清点全部页面。
 PIPELINE = ['reshape_home.py', 'build_about.py', 'build_blog.py', 'build_contact.py',
-            'build_products.py', 'build_404.py']
+            'build_products.py', 'build_404.py', 'build_seo.py']
 
 # 静态体检：不用浏览器、不用起服务，直接在产物上跑。都必须在生成之后执行。
 CHECKS = [
     os.path.join('qa', 'links.py'),     # 站内链接闭环 + 路径深度
     os.path.join('qa', 'classes.py'),   # 幽灵类（vendor.css 里没有的工具类）
+    os.path.join('qa', 'seo.py'),       # canonical / og / JSON-LD / robots / sitemap
 ]
 
 

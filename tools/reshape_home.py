@@ -15,18 +15,35 @@ Story line after this pass::
 
 Run:  python3 tools/reshape_home.py
 """
+import json
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import seo  # noqa: E402
 
 REF = 'tools/ref/index.before-reshape.html'
 OUT = 'index.html'
 MISS = []
 applied = {}
 
+# --------------------------------------------------------- head 的文案常量
+# title / description 现在各有两个消费方：stage_head() 写进 <title> 与
+# <meta description>，stage_seo() 写进 og:title / og:description / 结构化数据。
+# 所以提成常量 —— 同一句话存两份定义迟早会漂。
+HOME_TITLE = ('晓石云 | Rune Harness 云智算内核 — Rune 智算 / Moha 资产 / '
+              'AIRouter · AI聚合网关 / BOSS 运营')
+HOME_DESC = ('晓石云以 Rune 智算、Moha 资产、AIRouter · AI聚合网关、BOSS 运营'
+             '四大核心板块为基座，打造 Rune Harness 云智算内核，为企业提供私有化的 '
+             'AI 智算平台与云管理能力。')
+# 社交卡片另给一个短标题：上面那条 74 字符，是给搜索引擎的全文标题用的，
+# 放进卡片里会被平台截成半句。
+HOME_TITLE_OG = '破晓石科技 | Rune Harness 云智算内核'
+
 # 上游品牌名的回归哨兵 —— 与 tools/portal_page.py 里那条是同一份判据
-# （本脚本不依赖 portal_page，所以在这里再写一份；改一处请同步另一处，
-#  还有 tools/qa/reshape.mjs 里那条 JS 版本）。
+# （本脚本不依赖 portal_page 的派生逻辑，只 import 了纯常量的 seo，所以在这里
+#  再写一份；改一处请同步另一处，还有 tools/qa/reshape.mjs 里那条 JS 版本）。
 # 用正则而非字面量：既咬得住品牌名被写成两个词（带空格）的变体，也让
 # 全仓搜它归零 —— 哨兵不能自己是那唯一的命中项。
 UPSTREAM_BRAND_RE = re.compile(r'pipe\s*llm', re.I)
@@ -255,6 +272,100 @@ def scramble_guard():
                         % (measure_text, live_text, screen_reader_text))
 
 
+def seo_guard():
+    """首页 head 里那一整块 SEO 标签的守卫。
+
+    这一块是**全站 SEO 的源头**：13 个内容页的 head 都从这份 index.html 整篇
+    搬走，只是 derive() 认标记换成各自的一份。所以首页这一块缺了、或者标记被
+    改名，症状是「内容页静默少掉全部 canonical / og / 结构化数据」—— 页面照常
+    渲染，只有爬虫那边不对。必须在这里钉死。
+
+    期望值一律**不取自被检查对象**：url 与实体 id 来自 tools/seo.py 的常量，
+    图片与图标的「存在性」来自磁盘。
+    """
+    blocks = re.findall(seo.SEO_BLOCK_RE, body)
+    if len(blocks) != 1:
+        MISS.append('seo: expected exactly 1 block, found %d' % len(blocks))
+        return
+    block = blocks[0]
+
+    home_url = seo.page_url('index.html')
+    expected = [
+        ('canonical', '<link rel="canonical" href="%s">' % home_url),
+        ('og:url', '<meta property="og:url" content="%s">' % home_url),
+        # 首页必须可收录：noindex 只该出现在 404 页
+        ('robots indexable', 'content="%s"' % seo.ROBOTS_INDEX),
+        ('og:site_name', 'content="%s"' % seo.SITE_NAME),
+        ('og:locale', 'content="%s"' % seo.LOCALE),
+        # og:title / og:description 与 <title> / <meta description> 必须同源
+        ('og:title from HOME_TITLE_OG',
+         '<meta property="og:title" content="%s">' % seo.esc(HOME_TITLE_OG)),
+        ('og:description from HOME_DESC',
+         '<meta property="og:description" content="%s">' % seo.esc(HOME_DESC)),
+        ('twitter card', 'name="twitter:card" content="summary_large_image"'),
+        ('theme color', 'name="theme-color" content="%s"' % seo.THEME_COLOR),
+        ('block start', seo.SEO_START),
+        ('block end', seo.SEO_END),
+    ]
+    for label, needle in expected:
+        if needle not in block:
+            MISS.append('seo: missing %s in the home block' % label)
+
+    # 结构化数据：必须解析得动，且实体种类对得上（一个坏 JSON 在浏览器里
+    # 完全无声 —— 页面照常，只是那一段被爬虫整块丢弃）。
+    m = re.search(r'<script type="application/ld\+json">(.*?)</script>', block, re.S)
+    if not m:
+        MISS.append('seo: home block carries no JSON-LD')
+    else:
+        try:
+            data = json.loads(m.group(1))
+        except ValueError as exc:
+            MISS.append('seo: home JSON-LD does not parse: %s' % exc)
+        else:
+            types = [e.get('@type') for e in data.get('@graph', [])]
+            if types != ['Organization', 'WebSite']:
+                MISS.append('seo: home @graph is %s, want [Organization, WebSite]' % types)
+            ids = [e.get('@id') for e in data.get('@graph', [])]
+            if seo.ORG_ID not in ids or seo.SITE_ID not in ids:
+                MISS.append('seo: Organization / WebSite @id changed — 其余 13 页'
+                            '用 @id 指过来，改了这里等于断了全站实体')
+
+    # 页面不能出现 noindex（这是首页，唯一的 noindex 在 404 页）
+    if seo.ROBOTS_NOINDEX.split(',')[0] in block:
+        MISS.append('seo: the home page must not be noindex')
+
+    # 引用的图必须真在磁盘上。og:image 404 时社交平台只是静默不显示图，
+    # 抓取器不会报错 —— 没人会发现。
+    for rel in (seo.DEFAULT_OG_IMAGE, seo.ORG_LOGO,
+                'assets/img/favicon-96.png', 'assets/img/apple-touch-icon.png'):
+        if not os.path.exists(rel):
+            MISS.append('seo: %s is referenced but missing — 跑 tools/gen_og.py' % rel)
+
+    # 图标两条：PNG 在前、SVG 在后（顺序有意义，见 stage_icons）
+    if body.find('href="assets/img/favicon-96.png"') > body.find(
+            'href="assets/img/icon-mark.svg"'):
+        MISS.append('seo: the svg icon must come after the png one')
+
+
+def body_without_seo():
+    """整页除去 head 里那块 SEO 标签。
+
+    **只给两类守卫用：数出现次数、查「还有没有指向旧站的链接」。** 两边都是
+    被这次改动打红之后才补上的（2026-09-11 晚加 SEO）：
+
+      * SEO 块里本来就带着 `<title>` 与 `<meta description>` 的原文 ——
+        og:title / og:description / twitter:* 是**同一份入参**渲染出来的。
+        拿整页数品牌全称，会从 16 涨到 20，看着像「品牌写法多写了四处」。
+      * canonical、og:url、og:image 与结构化数据里的 @id 天然是本站的绝对
+        地址（`https://www.poxiaoshi.cn/…`）。而下面那条「全站不再指向旧站」
+        用的是最强判据「主域零出现」—— 不把这一块摘掉，它会把自己报成旧站链接。
+
+    反面同样要注意：**查「不该出现的文案」时必须用整页 body，不能摘 SEO 块** ——
+    那一块里的文案也是文案，旧品牌名漏进 og:title 一样是回归。
+    """
+    return seo.SEO_BLOCK_RE.sub('', body)
+
+
 def section_span(anchor, lo=0):
     """(start, end) of the <section> containing `anchor`.
 
@@ -430,13 +541,50 @@ def stage_head():
     # `AIRouter · AI聚合网关`，它自带一个 `·`；若并列仍用 `·`，标题会变成
     # 五个 `·` 串成的段落，被读成五个板块，和「四大核心板块」的叙事打架。
     # `/` 只在这一处（title 与跑马灯）出现，负责分层：`/` 分板块、`·` 分主副。
+    #
+    # 替换成哪两句由 HOME_TITLE / HOME_DESC 决定（stage_seo() 也用它们）。
     need('<title>晓石云 | 智算为中心的 AI 原生云内核 — 成都破晓石科技</title>',
-         '<title>晓石云 | Rune Harness 云智算内核 — Rune 智算 / Moha 资产 / AIRouter · AI聚合网关 / BOSS 运营</title>',
+         '<title>%s</title>' % HOME_TITLE,
          'title')
     need('content="专注云原生开源、混合云与 AI 智算平台，为企业提供覆盖容器云、混合云、智算云及 AI 能力的全栈解决方案。"',
-         'content="晓石云以 Rune 智算、Moha 资产、AIRouter · AI聚合网关、BOSS 运营四大核心板块为基座，'
-         '打造 Rune Harness 云智算内核，为企业提供私有化的 AI 智算平台与云管理能力。"',
+         'content="%s"' % HOME_DESC,
          'meta description')
+
+
+# 图标：PNG 一份 + SVG 一份。**顺序有意义** —— 现代浏览器在两者都够用时
+# 倾向最后一条，所以 SVG 放最后（矢量在任何 DPI 下都更利），PNG 放前面兜底
+# 老爬虫与老浏览器。Google 搜索结果的站点图标要求「正方形且是 48 的整数倍」，
+# 它对 SVG 的支持不如位图稳，96x96 那份就是给它的。
+PGN_ICONS = ('<link rel="icon" type="image/png" sizes="96x96" href="assets/img/favicon-96.png">\n'
+             '<link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png">\n')
+ICON_SVG_LINK = '<link rel="icon" type="image/svg+xml" href="assets/img/icon-mark.svg"'
+
+
+def stage_icons():
+    need1(ICON_SVG_LINK, PGN_ICONS + ICON_SVG_LINK, 'png icons')
+
+
+def stage_seo():
+    """把整块 SEO 标签钉进首页 head。
+
+    位置选在 `<link rel="preconnect"` 之前：**锚点不带 node id**
+    （其它的 head 标签都拖着 `data-page-node-id="…"` 那串上游快照的 id，
+    锚在它上面等于把上游的 id 写死进生成器）。
+
+    这一步必须早于所有内容页生成器：它们从已定稿的 index.html 整篇搬 head，
+    derive() 再认标记整块换掉。首页没有这一块，内容页就会「换了个不存在的
+    标记」而静默少掉全部 SEO 标签。
+    """
+    block = seo.seo_block(
+        title=HOME_TITLE,
+        description=HOME_DESC,
+        url=seo.page_url('index.html'),
+        kind='website',
+        og_title=HOME_TITLE_OG,
+    )
+    need1('<link rel="preconnect" href="https://fonts.googleapis.com"',
+          block + '\n<link rel="preconnect" href="https://fonts.googleapis.com"',
+          'seo block')
 
 
 ICONS = {
@@ -1773,8 +1921,7 @@ def stage_guards():
                      # （`·` 让给「主名 · 定位词」），AIRouter 段带全称。
                      # 四处独立出现的位置（hero pill / footer 产品列 / overline /
                      # 控制平面 lane）都要有全称，漏一处就是没统一。
-                     '<title>晓石云 | Rune Harness 云智算内核 — Rune 智算 / Moha 资产 / '
-                     'AIRouter · AI聚合网关 / BOSS 运营</title>',
+                     '<title>%s</title>' % HOME_TITLE,
                      '<span class="tf-overline">AIRouter · AI聚合网关</span>',
                      '</span>AIRouter · AI聚合网关</span>'):
         if required not in body:
@@ -1788,8 +1935,13 @@ def stage_guards():
     # measure / live / sr-only 里各出现一次，页脚那条会让计数从 16 涨到 18 ——
     # 那是动效的结构开销，不是品牌写法多写了一处。剥掉可见的两份（两份都
     # aria-hidden），留 sr-only 那份代表这一处「锁定的文案」。
+    #
+    # 再剥掉 head 里那块 SEO 标签（body_without_seo）：它把 title 与 description
+    # 又渲染了四次（og:title / og:description / twitter:title / twitter:description），
+    # 不剥就是 20。两处都是**结构开销**，不是「品牌写法多写了」。
     countable = re.sub(
-        r'<span class="tf-scramble-(?:measure|live)"[^>]*>[^<]*</span>', '', body)
+        r'<span class="tf-scramble-(?:measure|live)"[^>]*>[^<]*</span>',
+        '', body_without_seo())
     got = countable.count('AIRouter · AI聚合网关')
     if got != 16:
         MISS.append('expected sixteen `AIRouter · AI聚合网关` lockups on the homepage, got %d'
@@ -1900,7 +2052,12 @@ def stage_guards():
     # 三个**含 poxiaoshi.cn 但不是旧站**的域名，别被下面那条咬住：
     # `api.poxiaoshi.cn`（站内 API 域名，代码分隔线用）、`docs.poxiaoshi.cn`（文档站）、
     # `ppt.poxiaoshi.cn`（路演站）。它们都不是 `www.` 开头，所以精确到 `www.` 即可。
-    stale = re.findall(r'https://www\.poxiaoshi\.cn/[^"]*', body)
+    #
+    # 扫的是 body_without_seo()：本站**自己**的规范地址就是 `https://www.poxiaoshi.cn/`，
+    # canonical / og:url / og:image / 结构化数据的 @id 一律是绝对地址，用整页扫
+    # 会把自家的自指（self-reference）当成站外链接报出来。要抓的本来就是「正文里
+    # 还有没有指向旧站的 `<a href>`」，那一块里没有 href。
+    stale = re.findall(r'https://www\.poxiaoshi\.cn/[^"]*', body_without_seo())
     if stale:
         MISS.append('本站仍有指向旧站的链接 %d 条: %s' % (len(stale), sorted(set(stale))[:4]))
     # 定价区那六条：两条「查看完整报价 / 查看商务条款」→ /contact，四张卡 → 各自产品页。
@@ -2049,8 +2206,14 @@ def stage_guards():
     # 乱码动效的覆盖率。放在最后：它看的是所有 stage 都跑完之后的 body。
     scramble_guard()
 
+    # head 里那块 SEO 标签。同样放在最后：stage_seo 是第一个 stage，
+    # 但后面没有任何 stage 碰 head（内容页生成器才是消费方），
+    # 所以这里看到的与它们搬走的是同一份。
+    seo_guard()
 
-for fn in (stage_head, stage_nav, stage_nav_menu, stage_nav_company, stage_hero,
+
+for fn in (stage_head, stage_icons, stage_seo,
+           stage_nav, stage_nav_menu, stage_nav_company, stage_hero,
            stage_story, stage_xcmp,
            stage_rune_moha, stage_moha, stage_airouter, stage_boss, stage_harness,
            stage_pricing, stage_faq, stage_blog_cards, stage_footer_cta,

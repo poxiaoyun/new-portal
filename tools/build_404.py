@@ -149,6 +149,11 @@ def main():
         main_label='main body -> 404 兜底页',
         nav_label='nav active state -> 不归属任何组',
         depth=0,                    # 产物就在站点根
+        # 这一页对搜索引擎要**反过来**说话：别的页都在说「我是谁、来这里」，
+        # 它要说「别收录我」。GitHub Pages 把未命中路径都渲染成这一页并回 404，
+        # 但直接请求 /404.html 拿到的是 200 —— 不标 noindex 它就是一个可被收录
+        # 的、内容是「页面不存在」的页面。
+        seo_extra=dict(noindex=True),
     )
 
     # head 里插旧地址兼容层。**放在 derive() 之后**：chrome_fingerprint() 逐字节比对

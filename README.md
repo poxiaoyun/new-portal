@@ -2,9 +2,9 @@
 
 [www.poxiaoshi.cn](https://www.poxiaoshi.cn/) 的源码。
 
-静态站，没有前端框架、没有打包器、没有任何 npm 依赖：**14 个产物（13 个 `index.html`
-+ `404.html`）全部由 `tools/` 下的 Python 生成器派生，产物直接入库**，CI 每次 push 到
-`main` 重跑一遍生成器再发布到 GitHub Pages。
+静态站，没有前端框架、没有打包器、没有任何 npm 依赖：**16 个产物（13 个 `index.html`
++ `404.html` + `robots.txt` + `sitemap.xml`）全部由 `tools/` 下的 Python 生成器派生，
+产物直接入库**，CI 每次 push 到 `main` 重跑一遍生成器再发布到 GitHub Pages。
 
 ## 页面清单
 
@@ -26,14 +26,16 @@
 ```
 index.html            首页产物（由 tools/ref 的 pristine 快照 + reshape_home.py 派生）
 404.html about/ blog/ contact/ products/        其余 13 个产物
+robots.txt sitemap.xml                          SEO 产物（tools/build_seo.py）
 assets/css/*.css      vendor.css（换牌时搬来的编译产物，含整套设计令牌与组件族）
                       custom.css 及各页样式表（自己写的部分）
 assets/js/main.js     全站唯一的脚本：导航 / 滚动 / 乱码动效 / 对话回放 / 地图
 assets/img/*          图标、栅格纹理、客户 logo
+assets/img/og/        分享图与图标（tools/gen_og.py 渲染，见「SEO」一节）
 content/blog/*.md     博客内容源（frontmatter + 正文，本站自持）
-tools/*.py            页面生成器与公共库
+tools/*.py            页面生成器与公共库（seo.py 是 SEO 标签的唯一真源）
 tools/ref/*.html      首页的 pristine 快照 —— reshape_home.py 的输入，别删
-tools/qa/            体检脚本（静态两支 + 浏览器三支）
+tools/qa/            体检脚本（静态三支 + 浏览器三支）
 docs/                 设计评审与历史留档，**不上线**
 ```
 
@@ -44,17 +46,32 @@ python3 tools/build_all.py          # 全量重建 + 静态体检（顺序是硬
 python3 tools/build_all.py --check  # 只跑静态体检，不重建
 ```
 
-流水线顺序不能调：`reshape_home.py` 先产出首页，另外五个生成器都从**已定稿的
+流水线顺序不能调：`reshape_home.py` 先产出首页，中间五个生成器都从**已定稿的
 首页**里整篇取站芯（head / nav / 移动抽屉 / footer），并且会在写盘前断言首页一个
-字节都没被改动。顺序错了会得到站芯漂移的页面，而且是静默的。
+字节都没被改动。顺序错了会得到站芯漂移的页面，而且是静默的。最后的
+`build_seo.py` 要清点**全部**页面来产出 `robots.txt` / `sitemap.xml`，早于任何
+页面生成器就会漏页。
 
-凭据在构建期从环境变量注入，未配置时只用占位符并打 WARN，不会失败：
+一共 7 个生成器 + 3 项静态体检（`qa/links.py` / `qa/classes.py` / `qa/seo.py`），
+全绿时最后一行是 `pipeline ok: 7 generators + 3 static checks`。
+
+构建期从环境变量读入的值。**未配置一律只降级、不失败**（CI 里对每个缺失项打一条
+`::warning::`，否则「站点照常发布、只是搜索引擎那边悄悄少了一半能力」这种失败在
+本地完全看不见）：
 
 | 变量 | 用途 | 缺失后果 |
 | --- | --- | --- |
 | `WEB3FORMS_ACCESS_KEY` | 联系页表单 | 表单渲染正常但提交被拒 |
 | `TENCENT_MAP_KEY` | 联系页地图 | 退到降级卡 |
 | `SITE_BASE` | 部署前缀，见下文 | 默认按域名根 |
+| `SITE_URL` | canonical / `og:url` / sitemap 的规范主机，见 [SEO](#seo-与搜索引擎) | 默认 `https://www.poxiaoshi.cn` |
+| `GOOGLE_SITE_VERIFICATION` | Google Search Console 归属验证 | 少一条 meta，控制台验不过 |
+| `BAIDU_SITE_VERIFICATION` | 百度搜索资源平台归属验证 | 同上 |
+| `BING_SITE_VERIFICATION` | Bing 网站管理员工具归属验证 | 同上 |
+
+后四个都**不是凭据**（`SITE_URL` 是配置，三个验证码本来就要印在 HTML 里给人看），
+但它们同样不能由生成器凭空编一个：编出来的值会让站长后台挂着一个永远验不过的
+校验，比不输出更坏。所以走「构建期注入、未配置则整条不输出」。
 
 本地想用真值预览，写进仓库根 `.env.local`（已 gitignore）。
 
@@ -73,6 +90,7 @@ python3 tools/preview.py --port 9000
 ```bash
 python3 tools/qa/links.py     # 站内链接闭环 + 路径深度（静态，已进 build_all）
 python3 tools/qa/classes.py   # 幽灵类：HTML 用了、样式表里没有的类（静态，已进 build_all）
+python3 tools/qa/seo.py       # 每页 title/canonical/og/JSON-LD + robots/sitemap 对账（静态，已进 build_all）
 ```
 
 浏览器那两支要自己起服务，不进 `build_all`（CI 里没跑，`cdp.mjs` 是它们共用的会话层）：
@@ -84,22 +102,89 @@ node tools/qa/page.mjs    http://127.0.0.1:8899/index.html    # 零报错 / 资�
 node tools/qa/page.mjs    http://127.0.0.1:8899/index.html --shots tmp/shots
 ```
 
+## SEO 与搜索引擎
+
+全站 SEO 标签的**唯一真源**是 `tools/seo.py`（站点身份常量 + 各标签的组装函数）。
+改域名、改公司名、换 og 图，只改这一个文件，其余全是它的消费方：
+
+| 产物 | 谁产出 | 在 `build_all.py` 里？ |
+| --- | --- | --- |
+| 各页 head 里的 SEO 块 | `tools/seo.py`，由 `reshape_home.py` 与 `portal_page.derive()` 调用 | 是 |
+| `robots.txt` / `sitemap.xml` | `tools/build_seo.py` | 是 |
+| `assets/img/og*.png` 等 13 张图 | `tools/gen_og.py` | **否**，见下 |
+
+### 为什么 SEO 标签是一整块带标记的
+
+内容页的 head 是从首页**整篇搬来**的（见「构建」一节），而 SEO 标签里有一半逐页
+不同（canonical / `og:url` / `og:type` / JSON-LD / 404 还要反过来 noindex）。直接写进
+站芯会立刻打破 `chrome_fingerprint()` 那条「内容页站芯必须与首页逐字节相同」的不变量。
+所以它们被收进一个显式定界的块：
+
+```html
+<!--tf-seo:start--> … <!--tf-seo:end-->
+```
+
+首页连内容一起产出；`derive()` 认标记整块替换；`chrome_fingerprint()` 认标记整块剥掉
+再比对。**标记写法别改** —— 改了不是静默失效，是「站芯漂移」直接报错。
+
+### 分享图与图标
+
+`og:image`、`favicon-96.png`、`apple-touch-icon.png`、`icon-512.png` 都由
+`tools/gen_og.py` 用**无头 Chrome 渲染 HTML 卡片**得到，产物入库：
+
+```bash
+python3 tools/gen_og.py --list            # 看有哪些卡
+python3 tools/gen_og.py                   # 渲染全部 13 张
+python3 tools/gen_og.py --only blog       # 只渲染某一类（default/blog/product/icon）
+```
+
+它**刻意不进 `build_all.py`**：要起浏览器（CI 里没有），而图片只在改文案/换版式时
+才需要重出。改完卡片记得连产物一起提交，否则线上分享图会是旧的。
+
+三处「期望值不能取自被检查对象」的落实：canonical 主机取自 `seo.SITE_URL` 常量；
+`og:image:width/height` 现读 PNG/JPEG 文件头；sitemap 与 `qa/links.py` 共用同一套
+页面发现算法并**双向对账**（互查有没有对方没有的页）。
+
+### 三家搜索引擎
+
+产物侧齐了之后，剩下的动作在站长后台，各平台的入口与提交物：
+
+| 平台 | 验证方式 | 要提交 |
+| --- | --- | --- |
+| Google Search Console | `GOOGLE_SITE_VERIFICATION`（HTML 标记） | `https://www.poxiaoshi.cn/sitemap.xml` |
+| 百度搜索资源平台 | `BAIDU_SITE_VERIFICATION`（HTML 标记） | 同上，并在「普通收录 → sitemap」提交 |
+| Bing 网站管理员工具 | `BING_SITE_VERIFICATION` | 同上；也可直接从 GSC 导入 |
+
+`robots.txt` **刻意不写任何 `Disallow`** —— 整站没有登录墙、付费墙，也没有不该抓的
+目录，写了就得维护一份清单。它只声明 `Allow: /` 与 sitemap 地址。
+
+**不做百度主动推送。** 它要么需要服务端 token，要么往页面里塞一段会回连第三方的
+JS（后者是性能与隐私上的产品决策，不替用户拍）。目前走被动收录：sitemap + 正常的
+`robots.txt`，百度自己的爬虫会按这两者发现页面。
+
 ## 部署
 
-`.github/workflows/deploy-pages.yml`，push 到 `main` 触发。**四步顺序都不能动：**
+`.github/workflows/deploy-pages.yml`，push 到 `main` 触发。**五步顺序都不能动：**
 
 1. **Guard** —— 扫源码里有没有明文凭据。必须在 Build **之前**（构建会把凭据写进产物）。
-2. **Build** —— `python3 tools/build_all.py`，用 Secret 注入凭据。
-3. **Stage** —— 只把可发布的目录复制进 `dist/`。清单是**白名单 + 反向自查**：
-   正向清单漏项的表现是「什么都没发生」，所以还要反过来问一次「仓库里每个页面，
-   在清单里吗」。`tools/ content/ docs/` 绝不上线。
-4. **Inject** —— `python3 tools/site_base.py dist` 给站内根相对链接注入 `SITE_BASE`
+   顺带把「站长平台验证码没配」报成 warning（缺它不会失败，但三家控制台的归属验证
+   会一直过不去 —— 那个失败在本地完全看不见）。
+2. **Build** —— `python3 tools/build_all.py`，用 Secret 注入凭据与验证码。
+3. **Stage** —— 只把可发布的文件与目录复制进 `dist/`。清单是**白名单 + 反向自查**：
+   正向清单漏项的表现是「什么都没发生」，所以还要反过来问一次「仓库里有、清单里
+   没有的东西有哪些」。反向自查覆盖两类 —— 含页面的目录（按 `index.html` 找）和
+   站点根的散装文件（**非 `.md`、非隐藏的都必须在清单里**，`robots.txt` /
+   `sitemap.xml` 正是这一类）。`tools/ content/ docs/` 绝不上线。
+4. **Assert** —— 读 Pages API 的 `cname`（产物之外），**三个方向**查域名自洽：
+   `SITE_BASE` 是否与实际部署形态一致、`SITE_URL` 的主机是否就是 Pages 服务的域名、
+   以及产物首页的 canonical 是否真的按 `SITE_URL` 写。三者接起来才闭合 —— 少任何
+   一条，常量与实际都能各说各话而无人发现。
+5. **Inject** —— `python3 tools/site_base.py dist` 给站内根相对链接注入 `SITE_BASE`
    前缀。夹在 Stage 与 upload 之间：早于 Stage 时 `dist/` 还不存在，晚于 upload 时
    artifact 已经打包好了。
 
-`SITE_BASE` 必须与 Pages 域名配置一致，workflow 里有一条断言**两个方向都查**（绑了
-自定义域名却留着前缀、没绑域名却清空了前缀，症状都是「点任何链接都 404」）。期望值
-取自 Pages API 而不是产物本身 —— 产物自证不了自己的域名。
+`SITE_BASE` 必须与 Pages 域名配置一致（第 4 步两个方向都查，症状都是「点任何链接
+都 404」）。期望值取自 Pages API 而不是产物本身 —— 产物自证不了自己的域名。
 
 **只改 `dist/`，源码语义不动。** 全部生成器与体检脚本都建立在「站点根 == 域名根」这个
 假设上，产出根相对链接；一旦发布在子路径下，只在这一步改写产物。

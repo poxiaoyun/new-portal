@@ -2,16 +2,30 @@ name: Deploy to GitHub Pages
 
 # 本站是「生成器 + 提交产物」的静态站：页面由 tools/*.py 从快照派生后入库。
 # 所以 CI 这里做四件事，缺一不可（顺序也是硬依赖，见各步自己的注释）：
-#   1. 守住源码里没有明文凭据（在构建**之前**跑，构建会把凭据写进产物）
-#   2. 重跑生成器，用 Secret 注入 contact 页的 web3forms key 与腾讯地图 key
-#   3. 只把可发布的那几个目录传成 dist/（tools/ content/ docs/ 不上线）
+#   1. 守住源码里没有明文凭据（在构建**之前**跑，构建会把凭据写进产物），
+#      顺带把「站长平台验证码没配」这件事报成 warning
+#   2. 重跑生成器，用 Secret 注入 contact 页的 web3forms key、腾讯地图 key，
+#      以及三家站长平台的验证码
+#   3. 只把可发布的那几个文件与目录传成 dist/（tools/ content/ docs/ 不上线），
+#      然后反向自查一遍「仓库里有的东西是不是都进清单了」
 #   4. 把 SITE_BASE 前缀注入 dist/（夹在「staged」与「upload」之间 —— 早于 stage
 #      时 dist/ 还不存在，晚于 upload 时 artifact 已经打包好了）
 #
-# 需要两个仓库 Secret（Settings → Secrets and variables → Actions）：
-#   WEB3FORMS_ACCESS_KEY   web3forms 的 access key
-#   TENCENT_MAP_KEY        lbs.qq.com 的地图 key
-# 未配置时构建不失败，但那两项会退到占位符 / 降级卡 —— 见下面的 warning。
+# 夹在 3 与 4 之间的那条断言是「域名换了、忘了同步 SITE_BASE / SITE_URL」
+# 的守卫，它读 Pages API（产物之外）做期望值 —— 那类失败在本地没有任何症状。
+#
+# 需要的仓库 Secret（Settings → Secrets and variables → Actions）：
+#
+#   WEB3FORMS_ACCESS_KEY           web3forms 的 access key
+#   TENCENT_MAP_KEY                lbs.qq.com 的地图 key
+#   GOOGLE_SITE_VERIFICATION       Google Search Console 的验证码
+#   BAIDU_SITE_VERIFICATION        百度搜索资源平台的验证码
+#   BING_SITE_VERIFICATION         Bing 网站管理员工具的验证码
+#
+# 五项**未配置都不失败**，各自的降级后果见下面两步里的 warning。
+# 前两项是凭据（只在产物里出现，源码里不许有）；后三项不是凭据（本来就要
+# 印在 HTML 里给人看），但它们同样不能由生成器凭空编一个 —— 编出来的值会让
+# 站长后台挂着一个永远验不过的校验，比不输出更坏，所以也是构建期注入。
 
 on:
   push:
@@ -33,11 +47,16 @@ jobs:
     env:
       WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
       TENCENT_MAP_KEY: ${{ secrets.TENCENT_MAP_KEY }}
+      # 三家搜索引擎的站长平台归属验证码。空值 = 对应 meta 整条不输出
+      # （tools/seo.py 的 VERIFICATION 只渲染有值的那些）。
+      GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
+      BAIDU_SITE_VERIFICATION: ${{ secrets.BAIDU_SITE_VERIFICATION }}
+      BING_SITE_VERIFICATION: ${{ secrets.BING_SITE_VERIFICATION }}
       # 部署前缀。**必须与 Pages 的实际域名配置一致** ——
       #   绑了自定义域名（cname 非空）→ 站点在域名根 → 这里留空
       #   没绑域名（项目页）        → 站点在 /<repo>/ 子路径 → 这里是 /<repo>
-      # 放在 job 级而不是 step 级：下面「Assert SITE_BASE matches the Pages host」
-      # 那步要读它来做一致性断言。
+      # 放在 job 级而不是 step 级：下面「Assert SITE_BASE and SITE_URL match
+      # the Pages host」那步要读它来做一致性断言。
       #
       # 2026-09-11 晚：站点绑上 www.poxiaoshi.cn 之后忘了清空这里，产物里仍带
       # /new-portal/ 前缀 —— 页面本身在域名根下是好的（首页打得开），但点任何
@@ -54,14 +73,19 @@ jobs:
 
       # 必须排在 build 之前：构建会把凭据写进 contact/index.html，
       # 之后再扫就必然命中。只看源码目录，不看生成产物（产物里带 key 是设计如此）。
+      #
       # 不用 ${!name} 间接展开 —— 那是 bash 专有语法，抄到 zsh 里做本地演练会炸。
+      # 用 ${VAR:-} 而不是 ${VAR}：本脚本的行为要能在本地原样演练，而本地并没有
+      # 声明这些变量，`set -u` 下裸写会在赋 name=value 这一行就 unbound 退出 ——
+      # CI 里之所以没炸，只是因为 job 级 env: 把它们声明成了空串（局部幸运，
+      # 不是设计）。:- 让「未声明」与「声明为空」走同一条路（都是 warning）。
       - name: Guard — no plaintext credentials in the sources
         run: |
           set -uo pipefail
           failed=0
           for pair in \
-            "WEB3FORMS_ACCESS_KEY=${WEB3FORMS_ACCESS_KEY}" \
-            "TENCENT_MAP_KEY=${TENCENT_MAP_KEY}"
+            "WEB3FORMS_ACCESS_KEY=${WEB3FORMS_ACCESS_KEY:-}" \
+            "TENCENT_MAP_KEY=${TENCENT_MAP_KEY:-}"
           do
             name="${pair%%=*}"
             value="${pair#*=}"
@@ -75,6 +99,25 @@ jobs:
             fi
           done
           exit "${failed}"
+
+      # 缺验证码不会让构建失败，但后果在本地完全看不见：产物里没有对应的
+      # <meta>，三家站长后台的「验证网站归属」会一直过不去 —— 而收录报告、
+      # sitemap 提交、抓取诊断全都锁在那一步后面。所以至少要让它出声。
+      # 仍然不因为缺它就 exit 1：站点本身是好的，不该被一个可选配置卡住发布。
+      # 用 ${VAR:-}，理由同上一步。
+      - name: Report missing search-console verification codes
+        run: |
+          set -uo pipefail
+          for pair in \
+            "Google Search Console=${GOOGLE_SITE_VERIFICATION:-}" \
+            "百度搜索资源平台=${BAIDU_SITE_VERIFICATION:-}" \
+            "Bing 网站管理员工具=${BING_SITE_VERIFICATION:-}"
+          do
+            if [ -z "${pair#*=}" ]; then
+              echo "::warning::${pair%%=*} 的验证码未配置 —— 产物里不会有对应的 meta 标签，该平台的「验证网站归属」会一直过不去"
+            fi
+          done
+          exit 0
 
       - name: Build site (injects credentials from secrets)
         run: python3 tools/build_all.py
@@ -91,7 +134,11 @@ jobs:
           # （导航「产品」下拉 + 页脚在**每一页**上），等于线上全 404。
           # 404.html 同理：它是 GitHub Pages 的兜底页，也是旧地址的兼容层
           # （/new-portal/xxx -> /xxx），漏了它则「所有子页面的旧地址」一起失效。
-          PUBLISH="index.html 404.html .nojekyll assets about blog contact products"
+          #
+          # robots.txt / sitemap.xml 是 2026-09-11 补 SEO 时新增的。它们的失败
+          # 表现同样没有本地症状 —— 站点一切正常，只是搜索引擎抓不到 sitemap、
+          # 看不到 robots 里的 sitemap 指针，收录退化成纯靠外链发现。
+          PUBLISH="index.html 404.html .nojekyll robots.txt sitemap.xml assets about blog contact products"
           # 绝不上线的顶层目录：源码与工具。清单里出现它们就是错的 ——
           # 那等于把生成器、内容源与快照一起发给公网。
           DENY="tools content docs tmp outputs node_modules dist .git .github"
@@ -119,8 +166,21 @@ jobs:
               *) echo "::error::${page} 是页面，但顶层 ${top}/ 不在发布清单里"; missing=1 ;;
             esac
           done
-          # 站点根的散装 .html（index.html 之外的那些，比如 404.html）
-          for f in *.html; do
+          # 站点根的**散装文件**也一并反向查。判据是「非 .md、非隐藏 → 必须在
+          # 清单里」，而不是早先那样只遍历 *.html —— 只看 .html 时，robots.txt
+          # 与 sitemap.xml 这类「不是页面、但漏了就没收录」的文件即使不在清单里
+          # 也全绿，而它们的失败在本地没有任何症状。换成按类别排除之后，根下
+          # 以后新增任何东西都自动被覆盖。
+          #   *.md    → 项目文档，本来就不上线
+          #   .*      → 隐藏文件；其中只有 .nojekyll 要发布，它在清单里（上一步
+          #             的正向循环已经校验过它存在）
+          #   目录     → 交给上面那段基于 index.html 的自查（只有含页面的目录
+          #             才该在清单里，tools/ content/ docs/ 有意不上线）
+          for f in *; do
+            [ -f "${f}" ] || continue
+            case "${f}" in
+              *.md|.*) continue ;;
+            esac
             case " ${PUBLISH} " in
               *" ${f} "*) ;;
               *) echo "::error::站点根的 ${f} 不在发布清单里"; missing=1 ;;
@@ -130,39 +190,85 @@ jobs:
           echo "staged $(find dist -type f | wc -l) files:"
           ls -1 dist
 
-      # 域名与 SITE_BASE 必须自洽。这一步是「改了域名、忘改前缀」的守卫,
-      # **两个方向都查**：
-      #   绑了自定义域名却没清空前缀 → 产物链接写成 /new-portal/xxx，点哪都 404
-      #   没绑域名却把前缀清空了   → 项目页下链接写成 /xxx，同样点哪都 404
+      # 域名、SITE_BASE、SITE_URL 三者必须自洽。这一步是「换了域名、忘改另外
+      # 两处」的守卫，**三个方向都查**：
+      #   绑了自定义域名却没清空 SITE_BASE → 产物链接写成 /new-portal/xxx，点哪都 404
+      #   没绑域名却把 SITE_BASE 清空了   → 项目页下链接写成 /xxx，同样点哪都 404
+      #   SITE_URL 停在旧域名             → 页面全绿，但 canonical / og:url /
+      #                                     JSON-LD 把搜索引擎指向一个不再提供
+      #                                     这份内容的主机，等于自请降权
       # 期望值来自 **Pages API**（产物之外），不是来自被检查的产物 ——
       # 这正是「流程守卫 vs 内容守卫」的分界：本地预览与 qa/links.py 都在
       # 「站点根 == 域名根」这个假设上运行，谁都不会因为域名换了而变红。
-      - name: Assert SITE_BASE matches the Pages host
+      #
+      # 与 qa/seo.py 的分工：那边查「产物 == SITE_URL 常量」，这里查「SITE_URL
+      # 常量 == 真实部署形态」，外加「产物首页的 canonical == 常量」。三条接起来
+      # 才闭合 —— 少任何一条，常量与实际都能各说各话而无人发现。
+      - name: Assert SITE_BASE and SITE_URL match the Pages host
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
+          # 本步的**全部期望值**都由 GITHUB_REPOSITORY 派生。缺了它后面就是
+          # 空串与空串比较 —— 那会「全绿」，属于最坏的一种失败（守卫在，但
+          # 什么都没守）。所以先 fail-closed 一次。
+          repo_slug="${GITHUB_REPOSITORY:-}"
+          if [ -z "${repo_slug}" ]; then
+            echo "::error::GITHUB_REPOSITORY 未设置 —— 本步的期望值全部由它派生，无法判定"
+            exit 1
+          fi
           # 读不到就降级为 warning：GITHUB_TOKEN 拿这个端点偶有权限差异，
           # 不能因为读不到配置就把发布卡死。
-          if ! domain="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.cname // ""' 2>/dev/null)"; then
-            echo "::warning::无法读取 Pages 配置，跳过 SITE_BASE 一致性检查"
+          if ! domain="$(gh api "repos/${repo_slug}/pages" --jq '.cname // ""' 2>/dev/null)"; then
+            echo "::warning::无法读取 Pages 配置，跳过 SITE_BASE / SITE_URL 一致性检查"
             exit 0
           fi
+          repo="${repo_slug#*/}"
           base="${SITE_BASE:-}"
           if [ -n "${domain}" ]; then
-            if [ -n "${base}" ]; then
-              echo "::error::Pages 已绑定自定义域名 '${domain}'（站点在域名根），但 SITE_BASE='${base}'。产物里的链接会被写成 ${base}/xxx，线上点任何链接都 404 —— 请把 SITE_BASE 清空。"
-              exit 1
-            fi
-            echo "ok: 自定义域名 ${domain} + SITE_BASE 为空 —— 自洽"
+            # 绑了自定义域名：站点在域名根，前缀必须为空。
+            want_host="${domain}"
+            want_path=""
+            shape="自定义域名 ${domain}，站点在域名根"
           else
-            want="/${GITHUB_REPOSITORY#*/}"
-            if [ "${base}" != "${want}" ]; then
-              echo "::error::未绑定自定义域名（站点在 ${want}/ 子路径），但 SITE_BASE='${base}'，应为 '${want}'。"
-              exit 1
-            fi
-            echo "ok: 项目页子路径 ${want}/ + SITE_BASE=${base} —— 自洽"
+            # 项目页：站点在 /<repo>/ 子路径。
+            want_host="${repo_slug%%/*}.github.io"
+            want_path="/${repo}"
+            shape="项目页子路径，站点在 ${want_path}/"
           fi
+
+          # canonical 的主机来源（tools/seo.py）。读的是**常量**，期望侧读的是
+          # Pages 配置 —— 两边不同源，所以这个比对有信息量。
+          # 本步骤在 site_base 注入**之前**跑，此时 dist/ 已由上一步 stage 好；
+          # canonical 是绝对 URL，本来也不受前缀注入影响。
+          site_url="$(python3 -c 'import sys; sys.path.insert(0, "tools"); import seo; print(seo.SITE_URL)')"
+          got_host="${site_url#https://}"
+          got_host="${got_host%%/*}"
+          got_path="${site_url#https://${got_host}}"
+
+          failed=0
+          if [ "${base}" != "${want_path}" ]; then
+            echo "::error::SITE_BASE='${base}'，但 ${repo_slug} 的部署形态（${shape}）要求 '${want_path}' —— 产物里的站内链接会点哪都 404。"
+            failed=1
+          fi
+          if [ "${got_host}" != "${want_host}" ]; then
+            echo "::error::tools/seo.py 的 SITE_URL 指向主机 '${got_host}'，但 Pages 实际服务的是 '${want_host}'（${shape}）。canonical / og:url / JSON-LD 会把搜索引擎引到一个不提供这份内容的主机 —— 请把 SITE_URL 改成 https://${want_host}${want_path}。"
+            failed=1
+          fi
+
+          # 反向：产物真的按这个常量写了吗？少了这条，常量与部署形态可以完全
+          # 一致，而产物里却是别处硬编码的另一个域名 —— 那种情况下前两条全绿。
+          canon="$(grep -o '<link rel="canonical" href="[^"]*"' dist/index.html | head -1 | sed 's/.*href="//; s/"$//')"
+          if [ -z "${canon}" ]; then
+            echo "::error::dist/index.html 里找不到 canonical —— SEO 块没进产物（tools/reshape_home.py 的 stage_seo() 没跑？）"
+            failed=1
+          elif [ "${canon}" != "${site_url}/" ]; then
+            echo "::error::dist/index.html 的 canonical 是 '${canon}'，与 SITE_URL='${site_url}' 不符（首页应为 '${site_url}/'）。"
+            failed=1
+          fi
+
+          [ "${failed}" -eq 0 ] || exit 1
+          echo "ok: ${repo_slug}（${shape}） / SITE_BASE='${base}' / SITE_URL='${site_url}' / canonical='${canon}' —— 自洽"
 
       # 必须在 stage 之后（dist 才有内容）、在 upload 之前（artifact 打包的是
       # 这里改写过的产物）。顺序反了就是「发布了一棵没注入前缀的树」，

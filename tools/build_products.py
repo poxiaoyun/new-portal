@@ -81,6 +81,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import seo  # noqa: E402
 # 晚（十一）删掉收尾 CTA 之后，ARROW_S 与 ext 在这个文件里再没有使用者：ARROW_S 只被
 # `closing()` 的链接组用，ext 只被 `closing()` 与 `brand_action()` 用 —— 后者内部自己
 # 调，不需要这里传入。留着就是两个没人引用的 import。
@@ -518,6 +519,9 @@ def main():
             main_label='main body -> %s 产品页' % p['name'],
             nav_label='nav active state -> 产品',
             depth=DEPTH,
+            # 每个产品一张自己的 og 卡片：产品名 + 定位 + 该板块强调色。
+            # 用默认图也不算错，但四个产品页分享出去是同一张图，等于白费。
+            seo_extra=dict(image=seo.og_image('product', p['slug'])),
         )
         home_len = len(home) if not home_len else home_len
         guards(ctx, p, doc, markup)
