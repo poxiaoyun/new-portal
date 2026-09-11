@@ -31,6 +31,16 @@ jobs:
     env:
       WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
       TENCENT_MAP_KEY: ${{ secrets.TENCENT_MAP_KEY }}
+      # 部署前缀。**必须与 Pages 的实际域名配置一致** ——
+      #   绑了自定义域名（cname 非空）→ 站点在域名根 → 这里留空
+      #   没绑域名（项目页）        → 站点在 /<repo>/ 子路径 → 这里是 /<repo>
+      # 放在 job 级而不是 step 级：下面「Assert SITE_BASE matches the Pages host」
+      # 那步要读它来做一致性断言。
+      #
+      # 2026-09-11 晚：站点绑上 www.poxiaoshi.cn 之后忘了清空这里，产物里仍带
+      # /new-portal/ 前缀 —— 页面本身在域名根下是好的（首页打得开），但点任何
+      # 链接都 404，症状极具迷惑性。那步断言就是为这个坑加的。
+      SITE_BASE: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,17 +96,49 @@ jobs:
           echo "staged $(find dist -type f | wc -l) files:"
           ls -1 dist
 
+      # 域名与 SITE_BASE 必须自洽。这一步是「改了域名、忘改前缀」的守卫,
+      # **两个方向都查**：
+      #   绑了自定义域名却没清空前缀 → 产物链接写成 /new-portal/xxx，点哪都 404
+      #   没绑域名却把前缀清空了   → 项目页下链接写成 /xxx，同样点哪都 404
+      # 期望值来自 **Pages API**（产物之外），不是来自被检查的产物 ——
+      # 这正是「流程守卫 vs 内容守卫」的分界：本地预览与 qa/links.py 都在
+      # 「站点根 == 域名根」这个假设上运行，谁都不会因为域名换了而变红。
+      - name: Assert SITE_BASE matches the Pages host
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          # 读不到就降级为 warning：GITHUB_TOKEN 拿这个端点偶有权限差异，
+          # 不能因为读不到配置就把发布卡死。
+          if ! domain="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.cname // ""' 2>/dev/null)"; then
+            echo "::warning::无法读取 Pages 配置，跳过 SITE_BASE 一致性检查"
+            exit 0
+          fi
+          base="${SITE_BASE:-}"
+          if [ -n "${domain}" ]; then
+            if [ -n "${base}" ]; then
+              echo "::error::Pages 已绑定自定义域名 '${domain}'（站点在域名根），但 SITE_BASE='${base}'。产物里的链接会被写成 ${base}/xxx，线上点任何链接都 404 —— 请把 SITE_BASE 清空。"
+              exit 1
+            fi
+            echo "ok: 自定义域名 ${domain} + SITE_BASE 为空 —— 自洽"
+          else
+            want="/${GITHUB_REPOSITORY#*/}"
+            if [ "${base}" != "${want}" ]; then
+              echo "::error::未绑定自定义域名（站点在 ${want}/ 子路径），但 SITE_BASE='${base}'，应为 '${want}'。"
+              exit 1
+            fi
+            echo "ok: 项目页子路径 ${want}/ + SITE_BASE=${base} —— 自洽"
+          fi
+
       # 必须在 stage 之后（dist 才有内容）、在 upload 之前（artifact 打包的是
       # 这里改写过的产物）。顺序反了就是「发布了一棵没注入前缀的树」，
       # 线上 708 条链接全 404，而本地预览和 qa/links.py 全是绿的。
       #
       # 为什么需要这一步：生成器与体检脚本共享「站点根 == 域名根」的假设，
-      # 产出根相对链接；但项目页的站点根在 /new-portal/ 子路径下。
+      # 产出根相对链接；一旦发布在子路径下就必须改写。
       # 改写只发生在发布产物上，源码语义不动 —— 完整论证见 tools/site_base.py 顶部。
-      # 日后绑定自定义域名（CNAME）就把 SITE_BASE 清空，切回根部署。
+      # 前缀的取值由 job 级的 SITE_BASE 决定（当前为空 = 域名根）。
       - name: Inject deploy prefix (subpath hosting)
-        env:
-          SITE_BASE: /new-portal
         run: python3 tools/site_base.py dist
 
       - name: Upload GitHub Pages artifact

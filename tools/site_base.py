@@ -10,14 +10,22 @@ build_products）以及体检脚本 qa/links.py，共享同一个假设：
     **站点根 == 域名根**
 
 于是它们产出 `href="/products/rune/"`、`href="/contact"` 这种根相对链接 ——
-数量是 807 条，每一页的导航与页脚都带。这个假设在「绑定自定义域名」或
-「发布到 <user>.github.io 根仓库」时成立，但在 **项目页** 上不成立：
+数量是 807 条，每一页的导航与页脚都带。这个假设在有些部署下成立，有些不成立：
 
-    https://poxiaoyun.github.io/new-portal/     <- 站点根在子路径
+    https://www.poxiaoshi.cn/                  <- 绑了自定义域名，站点在域名根  ✓
+    https://poxiaoyun.github.io/new-portal/    <- 项目页，站点根在子路径      ✗
 
 子路径下浏览器把 `/products/rune/` 解析成 `poxiaoyun.github.io/products/rune/`，
 807 条链接全部 404。而本地预览（`tools/preview.py` 起在站点根）和 qa/links.py
 的断言**都是绿的** —— 失败点落在「产物之外」，没人检查。
+
+**当前部署形态**：绑了自定义域名 `www.poxiaoshi.cn`，站点在**域名根**，所以
+workflow 里的 `SITE_BASE` 是**空字符串**，本脚本当前是空操作（走下面的空分支）。
+2026-09-11 傍晚曾部署在项目页子路径，那时 `SITE_BASE=/new-portal`。
+两种形态的切换只需要改 workflow 里那**一个**变量 —— 但也正因为只是改一个变量，
+忘改过一次（绑域名后没同步清空，产物里仍带 `/new-portal/`，线上首页打得开、
+点任何链接都 404），所以 workflow 里补了「Assert SITE_BASE matches the Pages host」
+那步守卫，两个方向都查。
 
 修法选择：**不动源码语义，只在发布前改写产物**
 --------------------------------------------
@@ -40,9 +48,9 @@ C 的好处是前缀只在一处（workflow 的 SITE_BASE），源码继续表�
   （2026-09-11 审查吃过一次亏，见 docs/CODE-REVIEW-2026-09-11.md）。
 
 用法：
-    python3 tools/site_base.py dist --base /new-portal
+    python3 tools/site_base.py dist                 # 根部署（当前）：空操作，只打印说明
     SITE_BASE=/new-portal python3 tools/site_base.py dist
-    python3 tools/site_base.py dist                 # base 为空 = 根部署，空操作
+    python3 tools/site_base.py dist --base /new-portal
 """
 
 import argparse
