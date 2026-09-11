@@ -11,7 +11,8 @@
   * 每个相对资源引用必须带**恰好等于页面深度**的 `../` 前缀（少一层 404，多一层也 404）
   * 每个内容页都必须至少被一个页面链接到（孤儿页 = 写了但没人能到）
 
-页面是自动发现的（扫所有 `index.html`），所以新加一页不用改这里。
+页面是自动发现的（任意深度的 `index.html` + 站点根的 `404.html`），所以新加一页
+不用改这里。
 
 用法
 ----
@@ -42,18 +43,29 @@ SKIP_DIRS = {'.git', 'node_modules', 'tools', 'tmp', 'outputs', '.workbuddy',
 # 这种情况（stale whitelist），一旦某条目没有任何页面引用就报错，逼着清理。
 NOT_BUILT_YET = {}
 
+# 入口页：不需要别的页面链过来。首页是站内自然的根；404.html 是浏览器在未命中
+# 路径上**直接渲染**的（GitHub Pages 拿它当兜底），任何页面都不会、也不该链到它。
+ENTRY_PAGES = {'index.html', '404.html'}
+
 HREF = re.compile(r'href="([^"]*)"')
 SRC_HREF = re.compile(r'(?:src|href)="([^"]*)"')
 
 
 def discover_pages(root):
-    """扫出站点里所有页面（index.html），按路径排序。"""
+    """扫出站点里所有页面：任意深度的 index.html，加上站点根的 404.html。
+
+    404.html 不是 index.html —— 不专门认它的话，它就落在所有体检之外。而它恰恰是
+    最容易腐烂的一页：产物入库、没人会点进去看、还必须跟着站芯（nav / 页脚）一起
+    演进。只认站点根上的那一份，因为 GitHub Pages 也只认这一份。
+    """
     pages = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith('.')]
         if 'index.html' in filenames:
             rel = os.path.relpath(os.path.join(dirpath, 'index.html'), root)
             pages.append(rel)
+    if os.path.isfile(os.path.join(root, '404.html')):
+        pages.append('404.html')
     return sorted(pages)
 
 
@@ -127,7 +139,7 @@ def check(root=ROOT, quiet=False):
 
     # ------------------------------------------------------------ 孤儿页
     for page, n in sorted(inbound.items()):
-        if page == 'index.html':
+        if page in ENTRY_PAGES:
             continue
         if n == 0:
             problems.append('%s is an orphan — no page links to it' % page)

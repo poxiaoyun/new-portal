@@ -1,0 +1,151 @@
+/* =========================================================================
+   404 · 页面不存在（/404.html）
+   -------------------------------------------------------------------------
+   这个页面有两份职责，别被「404」这个名字骗了：
+
+   1. **全站兜底页**。GitHub Pages 在任意未命中的路径上返回它，所以它是唯一一个
+      「所有不存在的地址都会经过」的页面。
+
+   2. **旧地址的兼容层**。域名从项目页换成 www.poxiaoshi.cn 之后，站点根从
+      `/new-portal/` 变成了域名根，此前按 `/new-portal/xxx` 收下的地址全都不存在
+      了。页面顶部的脚本把这段前缀剥掉再跳转（见 tools/build_404.py）。
+
+   把「剥前缀」放在 404 页上是有意的：它一处就覆盖了**全部子页面** —— contact、
+   products/rune、blog/… 任何一条旧地址都会先落到这里。若改成给每个页面各加一份
+   兼容逻辑，就又多了一张要跟着页面清单维护的表。
+
+   样式沿用首页 / 关于页的写法：外壳（nav / 抽屉 / 页脚）由生成器从 index.html
+   整篇搬来，这里只放本页独有的部分；颜色一律取 custom.css 的 --tf-* 调色板，
+   不写字面量。命名统一 .tf-404- 前缀。
+   ========================================================================= */
+
+/* ----------------------------------------------------------------- 页首 */
+/* 垂直间距只能写在这里。踩过的坑（见 about.css 同一段）：生成器里手写的
+   Tailwind 类 `pt-4` / `pb-16` 之类未必存在于 vendor.css —— 它是上游的编译产物，
+   上游用过什么才有什么，写了等于没写，垂直内边距会静默塌成 0、内容贴上 fixed
+   顶栏。tools/qa/classes.py 现在会拦这类幽灵类。 */
+.tf-404-hero {
+  position: relative;
+  overflow: hidden;
+  /* 顶栏是 fixed + 116px 占位。这页只有一屏内容，比关于页的 hero 收一点，
+     但不能塌 —— 上一版 about 页就是在这里贴着顶栏的。 */
+  padding-top: clamp(2.5rem, 5vw, 4rem);
+  padding-bottom: clamp(2.5rem, 4.5vw, 4rem);
+}
+/* 与首页 / 关于页同一道自上而下的品牌光晕，保证进错页也是同一个家族 */
+.tf-404-hero:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -16rem;
+  width: 56rem;
+  height: 38rem;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, var(--tf-rune-4), transparent);
+  pointer-events: none;
+}
+.tf-404-hero > * { position: relative; }
+
+/* 巨型 404：纯装饰，屏幕阅读器读 h1 就够了，所以 aria-hidden 写在使用处。
+   描边字而不是实心字 —— 实心会在浅色主题下糊成一团，描边在任何主题都成立。 */
+.tf-404-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(4.2rem, 12vw, 8.5rem);
+  font-weight: 600;
+  line-height: .88;
+  letter-spacing: -.055em;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--tf-line-strong);
+}
+
+/* 首屏底部那行元信息，与关于页 .tf-about-hero-meta 同形（同间距、同字号、
+   同大写间距），让两页的页首读起来是同一套排版 */
+.tf-404-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: .7rem;
+  margin: 2.4rem 0 0;
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.tf-404-hero-meta i {
+  width: .28rem;
+  height: .28rem;
+  border-radius: 50%;
+  background: var(--tf-line-strong);
+  display: inline-block;
+}
+
+/* --------------------------------------------------------------- 入口清单 */
+.tf-404-suggest {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-bottom: clamp(3rem, 5vw, 4.5rem);
+}
+.tf-404-suggest-inner {
+  max-width: 920px;
+  margin: 0 auto;
+}
+.tf-404-suggest-head {
+  margin: 0;
+  padding: .9rem 0;
+  border-top: 1px solid var(--tf-line-strong);
+  color: var(--tf-label);
+  font-family: var(--font-mono);
+  font-size: .63rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.tf-404-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .tf-404-links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.tf-404-link {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  padding: 1rem 1.4rem 1.1rem 0;
+  border-bottom: 1px solid var(--tf-line);
+  text-decoration: none;
+  color: var(--tf-label);
+  /* 时长取导航那套 --tf-nav-hover，全站 hover 一个手感。缓动用 vendor 的
+     --motion-ease-out —— 这两个变量都定义在 vendor.css / custom.css 里，
+     名字不存在时整条 transition 会被判为无效声明而静默失效。 */
+  transition: color var(--tf-nav-hover) var(--motion-ease-out),
+              border-color var(--tf-nav-hover) var(--motion-ease-out);
+}
+.tf-404-link b {
+  color: #fff;
+  font-size: .95rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+.tf-404-link span {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  opacity: .72;
+}
+.tf-404-link:hover {
+  color: var(--tf-rune-80);
+  border-color: var(--tf-rune-55);
+}
+.tf-404-link:hover b { color: var(--tf-rune-80); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tf-404-link { transition: none; }
+}

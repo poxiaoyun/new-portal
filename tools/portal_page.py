@@ -216,6 +216,9 @@ def derive(ctx, out_rel, title, description, extra_css, main_markup,
     title / description 写进 head；extra_css 形如 'blog.css'（产物里会按 depth
     插成 `../assets/css/blog.css` 或 `../../assets/css/blog.css`）；main_markup 是
     `<main>` 里要放的内容；depth 是产物相对站点根的层数。
+
+    active_group 是「导航里哪一组该亮」。传 None 表示这一页不归属任何组
+    （404 页），此时只摘掉首页的选中态 —— 见下面「导航选中态」那段。
     """
     if not os.path.exists(HOME):
         raise SystemExit('missing %s — 先跑 tools/reshape_home.py 生成首页' % HOME)
@@ -247,8 +250,19 @@ def derive(ctx, out_rel, title, description, extra_css, main_markup,
 
     # ------------------------------------------------------------ 导航选中态
     # 首页把 is-active 挂在「首页」上；内容页要把它挪到自己所属的导航组。
+    # active_group=None 表示这一页**不属于任何导航组**（目前只有 404 页）：
+    # 只摘掉首页的选中态，不再挂到别处 —— 随便挂一组都是假信息，而且会让人
+    # 以为「关于我们」下真有这么一个页面。chrome_fingerprint() 本来就先把
+    # is-active 抹平再比，所以这不会影响站芯一致性断言。
     if 'class="tf-nav-menu-link is-active"' not in doc:
         ctx.miss.append('nav active link anchor missing')
+    elif active_group is None:
+        doc = doc.replace('class="tf-nav-menu-link is-active"',
+                          'class="tf-nav-menu-link "', 1)
+        if 'class="tf-nav-menu-link is-active"' in doc:
+            ctx.miss.append('nav active state survived removal')
+        else:
+            ctx.applied[nav_label or 'nav active state'] = 1
     else:
         doc = doc.replace('class="tf-nav-menu-link is-active"',
                           'class="tf-nav-menu-link "', 1)

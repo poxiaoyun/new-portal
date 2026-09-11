@@ -82,17 +82,49 @@ jobs:
           set -euo pipefail
           rm -rf dist
           mkdir dist
-          # products/ 是四个产品子页（products/<slug>/index.html）。2026-09-11 审查
-          # 发现它没在这张清单里 —— 而全站有 269 条站内链接指向 /products/*/
-          # （导航「产品」下拉 + 页脚在**每一页**上，首页正文另有 9 条），
-          # 漏了它等于线上把这 269 条全部打成 404。
-          # 加目录时对照 `ls -1d */` 逐个核：站点根下可发布的只有这六个，
-          # 其余（tools/ content/ docs/ tmp/ outputs/）都不该上线。
-          for path in index.html .nojekyll assets about blog contact products; do
-            if [ -e "${path}" ]; then
-              cp -R "${path}" dist/
+          # 发布清单。加东西时**不用靠记性**：下面那段反向自查会把「仓库里有页面
+          # 但不在清单里」直接报成错误。
+          #
+          # products/ 曾经漏在这张清单外 —— 而全站有 269 条站内链接指向它
+          # （导航「产品」下拉 + 页脚在**每一页**上），等于线上全 404。
+          # 404.html 同理：它是 GitHub Pages 的兜底页，也是旧地址的兼容层
+          # （/new-portal/xxx -> /xxx），漏了它则「所有子页面的旧地址」一起失效。
+          PUBLISH="index.html 404.html .nojekyll assets about blog contact products"
+          # 绝不上线的顶层目录：源码与工具。清单里出现它们就是错的 ——
+          # 那等于把生成器、内容源与快照一起发给公网。
+          DENY="tools content docs tmp outputs node_modules dist .git .github"
+          for path in ${PUBLISH}; do
+            if [ ! -e "${path}" ]; then
+              echo "::error::发布清单里的 ${path} 不存在 —— 清单与仓库已经漂移"
+              exit 1
             fi
+            case " ${DENY} " in
+              *" ${path} "*) echo "::error::${path}/ 是源码目录，不该上线"; exit 1 ;;
+            esac
+            cp -R "${path}" dist/
           done
+          # 反向自查。正向清单永远是「照单执行」，漏项的表现是「什么都没发生」，
+          # 不会报错 —— 所以必须反过来问一次：仓库里每个页面，在清单里吗？
+          # 只看**顶层**目录名：products/ 的页面在两级深处
+          # （products/<slug>/index.html），按整条路径比会漏掉这一类。
+          missing=0
+          for page in $(find . -name index.html \
+                        -not -path './.git/*' -not -path './dist/*'); do
+            page="${page#./}"
+            top="${page%%/*}"
+            case " ${PUBLISH} " in
+              *" ${top} "*) ;;
+              *) echo "::error::${page} 是页面，但顶层 ${top}/ 不在发布清单里"; missing=1 ;;
+            esac
+          done
+          # 站点根的散装 .html（index.html 之外的那些，比如 404.html）
+          for f in *.html; do
+            case " ${PUBLISH} " in
+              *" ${f} "*) ;;
+              *) echo "::error::站点根的 ${f} 不在发布清单里"; missing=1 ;;
+            esac
+          done
+          [ "${missing}" -eq 0 ] || exit 1
           echo "staged $(find dist -type f | wc -l) files:"
           ls -1 dist
 
