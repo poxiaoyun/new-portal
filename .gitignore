@@ -1,0 +1,15 @@
+# 构建期凭据。两个都是前端凭据（产物里可见），但源码里不留明文 ——
+# 真值走 GitHub Secret，本地预览才写这里。见 tools/build_contact.py 顶部。
+.env.local
+
+# Pages 工作流用 actions/upload-pages-artifact 上传的可发布目录，
+# 只在 CI 里临时生成，不入库。
+dist/
+
+# Python 字节码。生成器是「被 import 的模块」（portal_page / mdrender），
+# 所以一跑就会在 tools/__pycache__ 留下 .pyc —— 之前没忽略，`git add .`
+# 会把它们一起提交进去（2026-09-11 审查发现）。
+__pycache__/
+*.py[cod]
+
+.DS_Store

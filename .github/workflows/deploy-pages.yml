@@ -1,0 +1,116 @@
+name: Deploy to GitHub Pages
+
+# 本站是「生成器 + 提交产物」的静态站：页面由 tools/*.py 从快照派生后入库。
+# 所以 CI 这里做三件事，缺一不可：
+#   1. 守住源码里没有明文凭据（在构建**之前**跑，构建会把凭据写进产物）
+#   2. 重跑生成器，用 Secret 注入 contact 页的 web3forms key 与腾讯地图 key
+#   3. 只把可发布的那几个目录传成 Pages artifact（tools/ content/ docs/ 不上线）
+#
+# 需要两个仓库 Secret（Settings → Secrets and variables → Actions）：
+#   WEB3FORMS_ACCESS_KEY   web3forms 的 access key
+#   TENCENT_MAP_KEY        lbs.qq.com 的地图 key
+# 未配置时构建不失败，但那两项会退到占位符 / 降级卡 —— 见下面的 warning。
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
+      TENCENT_MAP_KEY: ${{ secrets.TENCENT_MAP_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # 必须排在 build 之前：构建会把凭据写进 contact/index.html，
+      # 之后再扫就必然命中。只看源码目录，不看生成产物（产物里带 key 是设计如此）。
+      # 不用 ${!name} 间接展开 —— 那是 bash 专有语法，抄到 zsh 里做本地演练会炸。
+      - name: Guard — no plaintext credentials in the sources
+        run: |
+          set -uo pipefail
+          failed=0
+          for pair in \
+            "WEB3FORMS_ACCESS_KEY=${WEB3FORMS_ACCESS_KEY}" \
+            "TENCENT_MAP_KEY=${TENCENT_MAP_KEY}"
+          do
+            name="${pair%%=*}"
+            value="${pair#*=}"
+            if [ -z "${value}" ]; then
+              echo "::warning::secret ${name} is not set — the site will ship a placeholder for it"
+              continue
+            fi
+            if grep -rIl -- "${value}" tools assets content docs 2>/dev/null; then
+              echo "::error::${name} appears verbatim in the source files listed above"
+              failed=1
+            fi
+          done
+          exit "${failed}"
+
+      - name: Build site (injects credentials from secrets)
+        run: python3 tools/build_all.py
+
+      - name: Stage the publishable tree
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir dist
+          # products/ 是四个产品子页（products/<slug>/index.html）。2026-09-11 审查
+          # 发现它没在这张清单里 —— 而全站有 269 条站内链接指向 /products/*/
+          # （导航「产品」下拉 + 页脚在**每一页**上，首页正文另有 9 条），
+          # 漏了它等于线上把这 269 条全部打成 404。
+          # 加目录时对照 `ls -1d */` 逐个核：站点根下可发布的只有这六个，
+          # 其余（tools/ content/ docs/ tmp/ outputs/）都不该上线。
+          for path in index.html .nojekyll assets about blog contact products; do
+            if [ -e "${path}" ]; then
+              cp -R "${path}" dist/
+            fi
+          done
+          echo "staged $(find dist -type f | wc -l) files:"
+          ls -1 dist
+
+      # 必须在 stage 之后（dist 才有内容）、在 upload 之前（artifact 打包的是
+      # 这里改写过的产物）。顺序反了就是「发布了一棵没注入前缀的树」，
+      # 线上 708 条链接全 404，而本地预览和 qa/links.py 全是绿的。
+      #
+      # 为什么需要这一步：生成器与体检脚本共享「站点根 == 域名根」的假设，
+      # 产出根相对链接；但项目页的站点根在 /new-portal/ 子路径下。
+      # 改写只发生在发布产物上，源码语义不动 —— 完整论证见 tools/site_base.py 顶部。
+      # 日后绑定自定义域名（CNAME）就把 SITE_BASE 清空，切回根部署。
+      - name: Inject deploy prefix (subpath hosting)
+        env:
+          SITE_BASE: /new-portal
+        run: python3 tools/site_base.py dist
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
