@@ -39,7 +39,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from portal_page import Ctx, brand_action, derive, esc, ext, finish  # noqa: E402
+from portal_page import Ctx, brand_action, derive, esc, ext, finish, upstream_brand  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -204,11 +204,12 @@ def main():
     if re.search(r'(?:src|href)="\.\./', doc):
         ctx.miss.append('depth=0 页面上出现了 ../ 前缀 —— 资源会 404')
     # 旧品牌 / 上游残留（与 about 页同一份清单，两页都从线上换牌而来）
-    for leftover in ('PipeLLM', 'pipellm.ai', 'api.example.com', 'Why PipeLLM',
-                     'Building AI Infrastructure', 'Loki Wong', 'Nia Park',
-                     'WE ARE HIRING'):
+    for leftover in ('api.example.com', 'Building AI Infrastructure', 'Loki Wong',
+                     'Nia Park', 'WE ARE HIRING'):
         if leftover in doc:
             ctx.miss.append('leftover: ' + leftover)
+    if upstream_brand(doc):
+        ctx.miss.append('leftover: 上游品牌名')
     # 装饰性的大号 404 是本页唯一的视觉锚点，掉了页面就只剩一行标题
     if doc.count('class="tf-404-code"') != 1:
         ctx.miss.append('the decorative 404 numeral should appear exactly once')

@@ -4,16 +4,16 @@
 
 设计取舍
 --------
-pipellm.ai/about 的正文是一段 Webflow 片段（`/pipellm/about-body.html`，113 KB）
-加一份 538 KB 的 Webflow 样式表 `pipellm-saas.shared.*.css`，两者用的是
+原站（换牌前的那套模板，下同）的 about 页正文是一段 Webflow 片段（113 KB）
+加一份 538 KB 的 Webflow 样式表，两者用的是
 `page-wrapper` / `section-container` / `w-variant-<uuid>` 这套命名。直接把它们
 搬进来等于在本站里并存第二套设计系统：多 650 KB 资源、多一套命名、多一份要跟着
 上游演进的维护面。
 
-所以这里只借 pipellm/about 的**版式语言**（Hero + 编号特性列表 + 关键数字带 +
+所以这里只借原站 about 页的**版式语言**（Hero + 编号特性列表 + 关键数字带 +
 团队卡与招聘条 + 荣誉网格 + 历程节点 + 收尾 CTA，区块之间用 code divider 分隔），
 实现落在本站已有的 `.tf-section-*` 骨架与 `--tf-*` 调色板上。首页的那套皮肤本来
-就是对 pipellm 首页换牌来的，两者同源，所以关于页放进站内是同一个视觉家族。
+就是对原站首页换牌来的，两者同源，所以关于页放进站内是同一个视觉家族。
 
 站芯复用
 --------
@@ -43,7 +43,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from portal_page import (ARROW_S, Ctx, brand_action, code_divider, derive, esc, ext,  # noqa: E402
-                         finish, overline, reveal)
+                         finish, overline, reveal, upstream_brand)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -374,11 +374,12 @@ def main():
     elif pos != sorted(pos):
         ctx.miss.append('sections are out of order: ' + str(list(zip(order, pos))))
     # 站内不该出现的旧品牌 / 上游残留
-    for leftover in ('PipeLLM', 'pipellm.ai', 'api.example.com', 'Why PipeLLM',
-                     'Building AI Infrastructure', 'Loki Wong', 'Nia Park',
-                     'WE ARE HIRING', 'src="assets/'):
+    for leftover in ('api.example.com', 'Building AI Infrastructure', 'Loki Wong',
+                     'Nia Park', 'WE ARE HIRING', 'src="assets/'):
         if leftover in doc:
             ctx.miss.append('leftover / bad path: ' + leftover)
+    if upstream_brand(doc):
+        ctx.miss.append('leftover: 上游品牌名（见 portal_page.UPSTREAM_BRAND_RE）')
     # 星环必须画在 stage 里：直接给 .tf-section-inner 加 overflow:hidden 会切掉
     # .tf-section-frame 那四个 -1px 的角标（差点就这么发了）
     css_path = os.path.join(ROOT, 'assets', 'css', ABOUT_CSS)

@@ -64,10 +64,11 @@ import sys
 # 探针在 qa 里没有位置（那时还没注入），所以扩属性时请一并加断言。
 ATTR_RE = re.compile(r'\b(?P<attr>href|src)="(?P<url>/[^"]*)"')
 
-# CSS 里的根相对 url()。**只报告不阻断**：vendor.css 是原站编译产物，
-# 目前 3 处 url(/pipellm-assets/...) 对应的选择器（.tf-hero-card-side-dither /
-# .tf-about-team-image）在生产 HTML 里根本没被使用，是死代码。但站内 CSS
-# 一旦真的引用了根相对资源，子路径下同样 404 —— 所以至少要让它能被看见。
+# CSS 里的根相对 url()。**只报告不阻断**：换牌时搬过来的那份 vendor.css 里
+# 原本有 3 处 url(/<上游资源目录>/…)（对应的选择器 .tf-hero-card-side-dither /
+# .tf-about-team-image 全站无人使用，是死代码），已在 2026-09-11 的品牌清理里
+# 连同那两条 background-image 声明一起摘掉，目前为 0 处。但站内 CSS 一旦真的
+# 引用了根相对资源，子路径下同样 404 —— 所以这个探针留着，至少要让它能被看见。
 CSS_URL_RE = re.compile(r'url\(\s*[\'"]?(/[^\'")]*)')
 
 

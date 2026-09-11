@@ -8,7 +8,7 @@
 
 版式语言
 --------
-参照上游 `pipellm.ai/runtime` 那一页：左侧文案 + 右侧深色控制台面板，mono 小标签，
+参照原站 `/runtime` 那一页：左侧文案 + 右侧深色控制台面板，mono 小标签，
 居中 story 标题。**组件不新造**：vendor.css 里本就有整套 `tf-runtime-*`（42 个类）
 与 `tf-section-*` / `tf-overline` / `tf-brand-action` / `tf-contact-cta-*`，
 本脚本只是把它们按那页的顺序拼起来。本页家族自己的少量样式（页首双栏与内边距、
@@ -85,7 +85,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # `closing()` 的链接组用，ext 只被 `closing()` 与 `brand_action()` 用 —— 后者内部自己
 # 调，不需要这里传入。留着就是两个没人引用的 import。
 from portal_page import (Ctx, PRODUCT_NAV_GROUP, brand_action, code_divider,  # noqa: E402
-                         derive, esc, finish_many, overline)
+                         derive, esc, finish_many, overline, upstream_brand)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -496,7 +496,7 @@ def guards(ctx, p, doc, main_html):
     # --- head -----------------------------------------------------------
     if '<title>%s</title>' % esc('%s %s | %s' % (p['name'], p['sub'], SITE_NAME)) not in doc:
         miss('<title> not rewritten')
-    if 'PipeLLM' in doc or 'pipellm.ai' in doc:
+    if upstream_brand(doc):
         miss('upstream leftovers')
 
 

@@ -1,10 +1,12 @@
 name: Deploy to GitHub Pages
 
 # 本站是「生成器 + 提交产物」的静态站：页面由 tools/*.py 从快照派生后入库。
-# 所以 CI 这里做三件事，缺一不可：
+# 所以 CI 这里做四件事，缺一不可（顺序也是硬依赖，见各步自己的注释）：
 #   1. 守住源码里没有明文凭据（在构建**之前**跑，构建会把凭据写进产物）
 #   2. 重跑生成器，用 Secret 注入 contact 页的 web3forms key 与腾讯地图 key
-#   3. 只把可发布的那几个目录传成 Pages artifact（tools/ content/ docs/ 不上线）
+#   3. 只把可发布的那几个目录传成 dist/（tools/ content/ docs/ 不上线）
+#   4. 把 SITE_BASE 前缀注入 dist/（夹在「staged」与「upload」之间 —— 早于 stage
+#      时 dist/ 还不存在，晚于 upload 时 artifact 已经打包好了）
 #
 # 需要两个仓库 Secret（Settings → Secrets and variables → Actions）：
 #   WEB3FORMS_ACCESS_KEY   web3forms 的 access key

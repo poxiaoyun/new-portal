@@ -1,10 +1,11 @@
 """Reshape the 晓石云 homepage around four product boards + the Rune Harness core.
 
-The built `index.html` is a single giant artifact derived from the PipeLLM
-reference DOM (see build.py). This script re-derives the homepage from the
-pristine snapshot in `tools/ref/index.before-reshape.html` with anchored,
-re-runnable replacements, so the story change does not require hand-editing
-140 KB of markup.
+The built `index.html` is a single giant artifact derived from the upstream
+reference DOM (that first hand-off was a rebrand of the original template, and
+its pipeline script has since been retired). This script re-derives the
+homepage from the pristine snapshot in `tools/ref/index.before-reshape.html`
+with anchored, re-runnable replacements, so the story change does not require
+hand-editing 140 KB of markup.
 
 Story line after this pass::
 
@@ -22,6 +23,13 @@ REF = 'tools/ref/index.before-reshape.html'
 OUT = 'index.html'
 MISS = []
 applied = {}
+
+# 上游品牌名的回归哨兵 —— 与 tools/portal_page.py 里那条是同一份判据
+# （本脚本不依赖 portal_page，所以在这里再写一份；改一处请同步另一处，
+#  还有 tools/qa/reshape.mjs 里那条 JS 版本）。
+# 用正则而非字面量：既咬得住品牌名被写成两个词（带空格）的变体，也让
+# 全仓搜它归零 —— 哨兵不能自己是那唯一的命中项。
+UPSTREAM_BRAND_RE = re.compile(r'pipe\s*llm', re.I)
 
 
 # --------------------------------------------------------------- utilities
@@ -130,6 +138,123 @@ def ext(href):
     return ' target="_blank" rel="noopener noreferrer"' if href.startswith('http') else ''
 
 
+def scramble(text):
+    """Wrap `text` in the three-span host that drives the hover scramble.
+
+    The nesting is load-bearing, not decorative — vendor.css defines the three
+    pieces as one unit:
+        .tf-scramble-label    inline-grid + nowrap
+        .tf-scramble-measure  hidden, grid-area 1/1   <- holds the width
+        .tf-scramble-live     absolute inset:0        <- the only visible copy
+    Drop the measure and the box collapses to the width of whatever glyphs the
+    last frame happened to draw, so the line (and everything after it) jitters
+    while the animation runs. Drop the `.sr-only` and the label reaches screen
+    readers as random glyphs — both visible copies are aria-hidden.
+
+    Only short labels belong here. main.js runs one frame per ~2 characters with
+    the count capped, so the footer's `AIRouter · AI聚合网关` (17 chars, the
+    longest label on the site) settles in 0.67s — a little slower than a
+    four-character nav item (0.43s), versus the 1.68s it would take uncapped.
+    Don't wrap sentences: a description-length line still reads as "the site is
+    glitching" even at the cap.
+
+    main.js discovers these hosts by class rather than by a list of container
+    class names, so wrapping a label here is all it takes to make it animate.
+    """
+    if any(c in text for c in '<&'):
+        raise ValueError('scramble() takes plain text, got %r' % text)
+    return ('<span class="tf-scramble-label">'
+            '<span class="tf-scramble-measure" aria-hidden="true">%s</span>'
+            '<span class="tf-scramble-live" aria-hidden="true">%s</span>'
+            '<span class="sr-only">%s</span>'
+            '</span>' % (text, text, text))
+
+
+# 乱码动效的覆盖率基线。
+#
+# 这类 bug 的形状很特别：hover 时的**背景过渡照常工作**，只有文字不动 ——
+# 看上去「这一项有交互」，不逐条慢慢看就发现不了。实际连错三次：产品下拉四项、
+# 预约弹层四项、页脚 21 条，长期都在 main.js 的绑定选择器里，而它们的文字从来
+# 没有宿主（2026-09-11 用户报的就是产品下拉那四条）。
+#
+# 两条纪律落在这里：
+#   * 条数写死。从 body 里现算的期望会跟着错误一起漂移，等于没查。
+#   * 两个方向都查 —— 宿主包住了标签、但不在可点元素里，动效同样是死的，
+#     只是断在 JS 那一侧（closest() 找不到宿主）。
+SCRAMBLE_TARGETS = [
+    # (容器类, 条数, 这些是什么)
+    ('tf-nav-menu-link', 7, '首页/产品/解决方案/价格与服务/文档中心/关于我们/预约演示'),
+    ('tf-nav-dropdown-item', 8, '产品下拉 4 + 关于我们下拉 4'),
+    ('tf-nav-console-item', 4, '预约演示弹层 4'),
+    ('tf-footer-link', 21, '页脚四列 21（每一页都有，因为它在站芯里）'),
+]
+
+
+def scramble_guard():
+    for cls, want, note in SCRAMBLE_TARGETS:
+        # 同时认 `<a>` 与 `<button>`：导航里两个下拉触发器就是 button，只认 a
+        # 的话七个菜单项会被数成五个，而数量对不上本来就该报错 —— 报错信息却会
+        # 指向「少了两个」，与真实原因（正则太窄）完全无关。
+        # `(?=[\s"])` 而不是 `\b`：`-` 不是 word 字符，裸的 \b 在改名成
+        # `tf-footer-link-x` 之后照样匹配，守卫就静默失效了。
+        items = re.findall(
+            r'<(?:a|button)\b[^>]*\b' + cls + r'(?=[\s"])[^>]*>(.*?)</(?:a|button)>',
+            body, re.S)
+        if len(items) != want:
+            MISS.append('scramble: %s — expected %d, found %d (%s)'
+                        % (cls, want, len(items), note))
+        for idx, item in enumerate(items, 1):
+            if 'tf-scramble-label' not in item:
+                text = re.sub(r'<[^>]+>', '', item).strip()[:36]
+                MISS.append('scramble: %s #%d has no host — %r' % (cls, idx, text))
+
+    # 反向：宿主必须落在可点元素里。按 tag 逐对记账（`<a>` 不嵌 `<a>`），
+    # 而不是「往前找最近一个 <a>」那种靠字符窗口的写法 —— 窗口开大了会漏、
+    # 开小了会误报，而这两件事都只会在改动当天看起来是绿的。
+    def clickable(tag):
+        spans, depth, start = [], 0, None
+        for t in re.finditer(r'<' + tag + r'\b[^>]*>|</' + tag + r'>', body):
+            if t.group(0).startswith('</'):
+                if depth == 1 and start is not None:
+                    spans.append((start, t.end()))
+                depth = max(0, depth - 1)
+            else:
+                if depth == 0:
+                    start = t.start()
+                depth += 1
+        return spans
+
+    live_anchors = clickable('a') + clickable('button')
+    for m in re.finditer(r'class="tf-scramble-label"', body):
+        if not any(a <= m.start() < b for a, b in live_anchors):
+            MISS.append('scramble: host not inside a clickable — %r'
+                        % body[m.start():m.start() + 180])
+
+    # 三段式必须齐、且三份文本一致。缺一段的后果都是**静默**的：
+    #   * 缺 live    -> main.js 的 querySelector 拿不到节点，直接 return，动效没了
+    #   * 缺 measure -> 盒子按乱码帧里最宽的那一帧撑开，整行字在动画期间左右抖
+    #   * 三份不一致 -> 屏幕阅读器念的和眼睛看到的不是同一个词
+    # 生成器只有 scramble() 一个出口，正常不可能缺；这条是防「手改产物」与
+    # 「照抄时少抄一段」——两种都只会在浏览器里表现为「看起来有点不对」。
+    hosts = re.findall(
+        # `[^>]*>` 不能省：快照自带的宿主（导航七个菜单项、关于我们下拉四项、
+        # 预约触发器）每个标签上都挂着 data-page-node-id，写成 `class="…">`
+        # 会把它们全部判成「不合格」，而这 12 个恰恰是原本就正确的那些。
+        r'<span class="tf-scramble-label"[^>]*>'
+        r'<span class="tf-scramble-measure"[^>]*>([^<]*)</span>'
+        r'<span class="tf-scramble-live"[^>]*>([^<]*)</span>'
+        r'<span class="sr-only"[^>]*>([^<]*)</span>'
+        r'</span>', body)
+    declared = body.count('class="tf-scramble-label"')
+    if len(hosts) != declared:
+        MISS.append('scramble: %d hosts declared, %d well formed'
+                    % (declared, len(hosts)))
+    for measure_text, live_text, screen_reader_text in hosts:
+        if not measure_text == live_text == screen_reader_text:
+            MISS.append('scramble: the three copies disagree — %r / %r / %r'
+                        % (measure_text, live_text, screen_reader_text))
+
+
 def section_span(anchor, lo=0):
     """(start, end) of the <section> containing `anchor`.
 
@@ -186,7 +311,7 @@ def fill_children(attr, markup, label=None, key=None, lo=0):
     Four call sites (the two desktop dropdowns, the mobile drawer product group
     and the footer product column) all rebuilt the same
     `body[:open_tag_end(...)] + items + body[db - 6:]` slice by hand. The
-    container keeps its own attributes, so the PipeLLM node ids stay put.
+    container keeps its own attributes, so the original node ids stay put.
     """
     global body
     a, b = find_by_attr(body, attr, lo)
@@ -500,6 +625,11 @@ def stage_nav():
     # 2026-09-11：四条都改指站内产品页（`p['page']`）。`p['page']` 是根相对路径，
     # `ext()` 因此不会加 target/rel —— 站内跳转开新窗是错的，而在此之前这四处
     # 每一条都带着 `target="_blank"`。
+    #
+    # 同日晚：`.tf-nav-dropdown-title` 里的文本包成乱码宿主。此前这四行 hover 时
+    # 只有背景过渡、文字是死的 —— 而「关于我们」那四项（vendor 快照自带）一直有
+    # 乱码动效，两列下拉并排放在一起，差异一眼可见。title 的 `height:20px` /
+    # `line-height:19.6px` 与 company 那份逐字相同，所以同样的内嵌结构在这里也成立。
     ta, _ = find_by_attr(body, 'data-page-node-id="MxGAw2GdzzKKJRLgPDRZSM"')
     if ta < 0:
         MISS.append('desktop 产品 trigger')
@@ -510,13 +640,18 @@ def stage_nav():
             f'<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
             f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
             f'aria-hidden="true">{ICONS[p["key"]]}</svg></span>'
-            f'<span><span class="tf-nav-dropdown-title">{p["name"]}</span>'
+            f'<span><span class="tf-nav-dropdown-title">{scramble(p["name"])}</span>'
             f'<span class="tf-nav-dropdown-description">{p["desc"]}</span></span></a>'
             for p in PRODUCTS)
         fill_children('class="tf-nav-dropdown"', items, lo=ta,
                       key='nav desktop dropdown')
 
     # --- 预约演示 console dropdown
+    #
+    # 这里的产品名同样包成乱码宿主。注意 `<strong>` 的 `display:block` 不妨碍内嵌
+    # inline-grid —— 「关于我们」下拉的 title 就是同一种组合，已经在线上跑着。
+    # `small`（一句话简介）不包：它 8~10 字，按 main.js 的节奏封顶后仍会拖到
+    # 半秒以上，而且它跟标题一起跳会让整个弹层像出了故障。
     items = ['<p>选择产品_</p>']
     items += [
         f'<a href="{p["page"]}" class="tf-nav-console-item"{ext(p["page"])}>'
@@ -524,7 +659,7 @@ def stage_nav():
         f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" '
         f'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" '
         f'stroke-linejoin="round" aria-hidden="true">{ICONS[p["key"]]}</svg></span>'
-        f'<span><strong>{p["name"]}</strong><small>{p["short"]}</small></span>{ARROW_R}</a>'
+        f'<span><strong>{scramble(p["name"])}</strong><small>{p["short"]}</small></span>{ARROW_R}</a>'
         for p in PRODUCTS]
     fill_children('class="tf-nav-console-dropdown"', ''.join(items),
                   key='nav console dropdown')
@@ -532,7 +667,7 @@ def stage_nav():
     # --- mobile drawer product group
     links = ''.join(
         f'<a href="{p["page"]}"{ext(p["page"])} class="flex items-center gap-3 '
-        f'rounded-[var(--pl-radius-xxs)] '
+        f'rounded-[var(--pxs-radius-xxs)] '
         f'border border-white/10 bg-white/[0.04] px-4 py-3 font-mono text-sm text-white/72 '
         f'transition-colors">'
         f'<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
@@ -972,7 +1107,7 @@ def board_section(sid, order, overline, title, copy, link_text, link_href, panel
 
     `panel` is raw markup and keeps its own wrapper class, because the boards
     legitimately differ there (code panel vs. operations panel). `_attr`
-    arguments carry the PipeLLM node ids harvested from the snapshot so the
+    arguments carry the node ids harvested from the snapshot so the
     rebuilt sections keep their DOM ancestry.
     """
     frame = 'tf-section-inner tf-section-frame' + (' tf-section-wash' if wash else '')
@@ -1018,7 +1153,7 @@ def stage_airouter():
 
     intro = seg[ia:ib]
     code = seg[ca:cb]
-    # keep the PipeLLM node ids so the pane keeps its DOM ancestry
+    # keep the original node ids so the pane keeps its DOM ancestry
     sec_id = re.search(r'<section[^>]*?(\sdata-page-node-id="[^"]+")', seg)
     h2_id = re.search(r'<h2(\sdata-page-node-id="[^"]+")', intro)
     p_id = re.search(r'<p(\sdata-page-node-id="[^"]+")', intro)
@@ -1250,12 +1385,18 @@ def stage_footer_cta():
     # 深潜之外），所以落点是 Rune 产品页：XCMP 是 Rune 那一层的多云资源底座，
     # 首页正文就是这么写的（「向下由 XCMP 云管理能力提供多云资源底座」）。
     # 留在旧站的只剩 KubeGems —— 它本来就是站外的开源项目，不是换牌残留。
+    #
+    # 文本包成乱码宿主（2026-09-11 晚）。这里此前写的是
+    # `class="tf-footer-link hover-scramble"`：`hover-scramble` 在 vendor.css 与
+    # main.js 里都没有任何定义，是个只在生成器里出现过一次的死类名 —— 页脚这
+    # 21 条链接的 hover 动效从来就没生效过。类名删掉，改包真宿主；动效的真相源
+    # 只剩 `.tf-scramble-label` 一处，不留第二个看起来像实现的空壳。
     footer_links = [('产品总览', '/')]
     footer_links += [(p['pill'][0], p['page']) for p in PRODUCTS]
     footer_links += [('XCMP 云管理', '/products/rune/'),
                      ('KubeGems', 'https://kubegems.io')]
     html = ''.join(
-        f'<a class="tf-footer-link hover-scramble" href="{h}"{ext(h)}>{t}</a>'
+        f'<a class="tf-footer-link" href="{h}"{ext(h)}>{scramble(t)}</a>'
         for t, h in footer_links)
     fill_children('data-page-node-id="DSx57Z0vBkGaSPFY5k1RWp"', html,
                   key='footer 产品列')
@@ -1311,6 +1452,43 @@ def stage_footer_cta():
                   '页尾 CTA·预约演示')
 
 
+def stage_footer_scramble():
+    """给页脚所有链接的纯文本包上乱码宿主，并清掉死类名 `hover-scramble`。
+
+    「产品」列由 stage_footer_cta() 整段重写成带宿主的形式；其余 14 条（文档 /
+    解决方案 / 客户案例 / 公司四列）来自 pristine 快照，而快照给每一条都写了
+    `class="tf-footer-link hover-scramble"` —— `hover-scramble` 在 vendor.css 与
+    main.js 里**都没有定义**（整个仓库只有快照和生成器里出现过这个字符串）。
+    原作者显然打算给页脚做乱码动效，实现从未落地：hover 时只有颜色与位移，
+    文字是死的。
+
+    这一遍刻意不按来源区分，只认「`<a>` 里还是纯文本」这一条 —— 已经包过宿主的
+    产品列那 7 条，内容里是 `<span>`，天然不匹配。于是本函数跑第二遍是空操作，
+    不会把宿主套成两层（幂等，别改成按 class 白名单跳过的写法）。
+    """
+    global body
+    count = [0]
+
+    def wrap(m):
+        count[0] += 1
+        return m.group(1) + scramble(m.group(2)) + m.group(3)
+
+    # 内容用 `[^<]+` 而不是 `.*?`：一旦内容里出现标签，就说明它不是一条单纯的
+    # 文字链接（图标 + 文字的社交入口），那种不该包。
+    body = re.sub(r'(<a\b[^>]*\btf-footer-link(?=[\s"])[^>]*>)([^<]+)(</a>)',
+                  wrap, body)
+    applied['页脚链接乱码宿主'] = count[0]
+
+    # 空壳类名到此为止不该再出现在产物里。留着它，下一个读代码的人会以为页脚的
+    # 动效由它驱动，而真相在 .tf-scramble-label 上 —— 这次排查的时间就花在这上面。
+    leftover = body.count('hover-scramble')
+    if leftover:
+        body = re.sub(r'\s*hover-scramble\b', '', body)
+        applied['hover-scramble 空壳类名清理'] = leftover
+    if 'hover-scramble' in body:
+        MISS.append('hover-scramble survived the footer pass')
+
+
 def stage_contact_retarget():
     """站芯里的商务邮件链接统一改指 /contact（2026-09-11 晚（十三））。
 
@@ -1329,7 +1507,7 @@ def stage_blog_cards():
     `content/blog/*.md`，见 tools/build_blog.py），首页就不该再跳到 poxiaoshi.cn
     —— 这个站点的目的正是替换 poxiaoshi.cn。
 
-    三张卡原先的 href 是换牌时留下的上游 PipeLLM slug，三个都是本站不存在的死链：
+    三张卡原先的 href 是换牌时留下的上游博客 slug，三个都是本站不存在的死链：
     `/blog/agent-memory-next-bottleneck` 等等；`alt` 也还是那批英文。公告条那 10 个
     副本（marquee 横向滚动需要把同一段重复多份）指向线上 `/blog/`，一并收回。
 
@@ -1419,7 +1597,7 @@ def stage_guards():
     if opens != closes:
         MISS.append(f'unbalanced <div>: {opens} vs {closes} (delta {opens - closes})')
     for leftover in ('XMCP · 多云纳管', '不改现有体系，纳管每一朵云。', '三大核心产品',
-                     'PipeLLM', 'pipellm.ai', 'AI Router', 'ChatBox',
+                     'AI Router', 'ChatBox',
                      # 换牌时给首页三张博客卡自造的封面目录；2026-09-11 起首页
                      # 与详情页共用内容源的 cover（assets/img/news/…）
                      'assets/img/blog/',
@@ -1512,7 +1690,7 @@ def stage_guards():
                      # the footer 公司 column pointed at /about/ while being
                      # labelled 加入我们; corrected when about/ was built
                      'data-page-node-id="WQs06tBb1wDxj7OvovKSYT">加入我们</a>',
-                     # the blog preview cards carried three upstream PipeLLM
+                     # the blog preview cards carried three upstream blog
                      # slugs (all dead links) until /blog became self-hosted,
                      # and the announcement bar still pointed at the live
                      # poxiaoshi.cn blog -- see stage_blog_cards
@@ -1525,6 +1703,8 @@ def stage_guards():
                      'href="https://www.poxiaoshi.cn/blog/"'):
         if leftover in body:
             MISS.append('leftover copy: ' + leftover)
+    if UPSTREAM_BRAND_RE.search(body):
+        MISS.append('leftover copy: 上游品牌名（UPSTREAM_BRAND_RE 命中）')
     for required in ('Rune Harness 即将开放', 'tf-overline-live', 'tf-thinking-spin',
                      '智算为中心的 </span>', 'AI 原生云内核</span>',
                      '专注云原生开源、混合云与 AI 智算平台，为企业提供覆盖容器云、混合云、智算云及 AI 能力的全栈解决方案。',
@@ -1573,8 +1753,12 @@ def stage_guards():
                      'data-page-node-id="pHvRqXDT6WITPlOY4FYuEp">破晓石科技</span>',
                      # the nav lockup names the company too
                      'alt="破晓石科技 logo"',
-                     # 页脚「公司」列现在给的是公司简介页
-                     'data-page-node-id="WQs06tBb1wDxj7OvovKSYT">关于我们</a>',
+                     # 页脚「公司」列现在给的是公司简介页。名字包进乱码宿主之后，
+                     # 这一条的形态从「文本 + `</a>`」变成「文本在三段式宿主里」，
+                     # 锚点就落在宿主开标签上 —— 文案本身由 stage_footer_cta 的
+                     # need1 负责，这里只证「这条链接还在、且已接上动效」。
+                     'data-page-node-id="WQs06tBb1wDxj7OvovKSYT">'
+                     '<span class="tf-scramble-label">',
                      # the 产品 dropdown entries carry lucide stroke icons; the
                      # width comes from the custom.css override that cancels the
                      # vendor rule zeroing the stroke for the old filled icons
@@ -1599,7 +1783,14 @@ def stage_guards():
     # 跑马灯 10（无缝滚动把同一条文案复制成 10 份）+ hero pill 1 + 控制平面 lane 1 +
     # 板块 overline 1 + footer 产品列 1。少一处是某个 stage 漏改，多一处是旧写法
     # 没清干净 —— 这条计数比逐个 required 更能兜住「只改了一半」。
-    got = body.count('AIRouter · AI聚合网关')
+    #
+    # 计数前先把乱码宿主的重复副本摘掉：一条文字链接包成宿主后，同一份文本在
+    # measure / live / sr-only 里各出现一次，页脚那条会让计数从 16 涨到 18 ——
+    # 那是动效的结构开销，不是品牌写法多写了一处。剥掉可见的两份（两份都
+    # aria-hidden），留 sr-only 那份代表这一处「锁定的文案」。
+    countable = re.sub(
+        r'<span class="tf-scramble-(?:measure|live)"[^>]*>[^<]*</span>', '', body)
+    got = countable.count('AIRouter · AI聚合网关')
     if got != 16:
         MISS.append('expected sixteen `AIRouter · AI聚合网关` lockups on the homepage, got %d'
                     % got)
@@ -1855,12 +2046,20 @@ def stage_guards():
             css_bare):
         MISS.append('custom.css lost the 产品 dropdown stroke override')
 
+    # 乱码动效的覆盖率。放在最后：它看的是所有 stage 都跑完之后的 body。
+    scramble_guard()
+
 
 for fn in (stage_head, stage_nav, stage_nav_menu, stage_nav_company, stage_hero,
            stage_story, stage_xcmp,
            stage_rune_moha, stage_moha, stage_airouter, stage_boss, stage_harness,
            stage_pricing, stage_faq, stage_blog_cards, stage_footer_cta,
-           stage_contact_retarget, stage_guards):
+           stage_contact_retarget,
+           # 必须排在 stage_footer_cta 与 stage_contact_retarget 之后：前者把
+           # 「产品」列整段换掉、后者会改写页脚链接的开标签，这一遍要在两者都
+           # 定稿之后才数得准，也才包得全。
+           stage_footer_scramble,
+           stage_guards):
     fn()
 
 open(OUT, 'w', encoding='utf-8').write(body)

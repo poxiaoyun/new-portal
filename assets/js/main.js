@@ -16,7 +16,7 @@
   function fn(t) { return '<span class="tf-syntax-function">' + esc(t) + '</span>'; }
 
   /* ---------------------------------------------------------------- nav */
-  var nav = $('.pipellm-nav-surface');
+  var nav = $('.pxs-nav-surface');
   function onScroll() { if (nav) nav.classList.toggle('is-scrolled', window.scrollY > 12); }
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
@@ -336,47 +336,60 @@
   var GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/\\<>-_*';
   var busy = new WeakMap();
   /* 每帧毫秒数。一次 hover 的总时长 = 帧数 × 这个数，帧数由字数决定
-     （i < frame / 2 逐字还原，跑到 2 × 字数 收尾），所以它同时决定所有
-     菜单项「乱码跳动 → 还原」的快慢：
-       四字（解决方案 / 文档中心）  9 帧   0.23s → 0.43s
-       五字（价格与服务）          11 帧   0.29s → 0.53s
+     （见下面 scramble()），所以它同时决定所有标签「乱码跳动 → 还原」的快慢：
+       四字（解决方案 / 文档中心）  9 帧   0.43s
+       五字（价格与服务）          11 帧   0.53s
      2026-09-11 由 26 放慢到 48（用户反馈顶部导航的 hover 动效偏快、
      时间偏短）。要再调快慢，改这一个数就够了 —— 别去动帧数公式，
      那个公式同时管着「逐字还原」的顺序感。 */
   var SCRAMBLE_FRAME_MS = 48;
+  /* 帧数上限。不封顶时帧数 = 2×字数+1，页脚那条「AIRouter · AI聚合网关」
+     （17 字符）就要跑 35 帧 ≈ 1.68s —— 鼠标扫过页脚，一行字要乱一秒半还多，
+     是导航菜单项（4~5 字，0.43~0.53s）的三倍多。封顶后它落在 0.67s，只比短
+     标签长一点，而长标签本来就该稍慢。实测：4 字 9 帧 0.432s / 5 字 11 帧
+     0.528s / 7 字以上一律 14 帧 0.672s。 */
+  var SCRAMBLE_MAX_FRAMES = 14;
   function scramble(host) {
     if (!host || busy.get(host)) return;
     var live = host.querySelector('.tf-scramble-live');
     if (!live) return;
     var original = live.getAttribute('data-text') || live.textContent;
     live.setAttribute('data-text', original);
+    var total = Math.min(original.length * 2 + 1, SCRAMBLE_MAX_FRAMES);
     var frame = 0;
     busy.set(host, true);
     var id = setInterval(function () {
       frame += 1;
+      /* 已还原的字符数，随帧均匀推进到 original.length。按「已还原几个字」判断
+         而不是按帧号直接取整 —— 中英混排的标签（`Rune 智算`、`XCMP 云管理`）
+         这样才不会还原得忽快忽慢。 */
+      var settled = original.length * (frame / total);
       live.textContent = original.split('').map(function (ch, i) {
         if (ch === ' ') return ch;
-        if (i < frame / 2) return original[i];
+        if (i < settled) return original[i];
         return GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
       }).join('');
-      if (frame / 2 > original.length) {
+      if (frame >= total) {
         clearInterval(id);
         live.textContent = original;
         busy.delete(host);
       }
     }, SCRAMBLE_FRAME_MS);
   }
-  /* 绑定范围：导航菜单项、页脚链接，以及导航里两处下拉的选项
-     （产品四项、关于我们四项）与「预约演示」弹层里的选项。
-     后三类是 2026-09-11 补的 —— 用户要求「下拉选项里的按钮也要有动效」：
-     它们此前不在选择器里，hover 时文字是死的。没有 .tf-scramble-label 的
-     项（产品下拉四项就没有）在这里会直接返回，动效由 CSS 过渡承担。
+  /* 绑定范围：扫**所有乱码宿主**，往上找它所在的可点元素。
+     这里刻意不维护「哪些容器类该有动效」的白名单。此前是白名单
+     （`.tf-nav-menu-link` / `.tf-footer-link` / 两处下拉项 / 弹层项），代价是
+     「类名加进选择器」和「文字真的包了宿主」成了两份分散在不同文件里的清单 ——
+     必然漂移：产品下拉四项、预约弹层四项、页脚 21 条长期都在选择器里，而它们的
+     文字从来没有宿主，hover 时只有背景过渡、文字是死的（用户 2026-09-11 报的
+     就是产品下拉那四条）。改成自发现后宿主即唯一真相源：生成器里包一层
+     `scramble()` 就生效，不用回来改这里。
      开了「减弱动态效果」就整段不绑：CSS 那边只是把过渡时长归零，
      乱码跳动照样会跑，两边得一起关。 */
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    $$('.tf-nav-menu-link, .tf-footer-link, .tf-nav-dropdown-item, .tf-nav-console-item').forEach(function (el) {
-      var host = el.querySelector('.tf-scramble-label');
-      if (!host) return;
+    $$('.tf-scramble-label').forEach(function (host) {
+      var el = host.closest('a, button, [role="button"]');
+      if (!el) return;
       el.addEventListener('mouseenter', function () { scramble(host); });
     });
   }

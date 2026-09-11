@@ -4,7 +4,7 @@
    只放首页没有的组件。板块外壳（.tf-section-inner / .tf-section-frame /
    .tf-section-split / .tf-section-sidebar / .tf-overline / .tf-section-title）
    一律沿用 vendor.css，颜色一律取 custom.css 的 --tf-* 调色板与 vendor.css 的
-   --pl-* 变量 —— 换主题、加板块时不需要动这里。
+   --pxs-* 变量 —— 换主题、加板块时不需要动这里。
 
    命名统一以 .tf-about- 开头，方便一次 grep 出全页归属。图片用 CSS 相对路径
    （url(../img/…)），不受页面深度影响。
@@ -93,7 +93,7 @@
 }
 .tf-about-pillar > div > p {
   margin: .35rem 0 0;
-  color: var(--pl-text-muted);
+  color: var(--pxs-text-muted);
   font-size: .8rem;
   line-height: 1.65;
 }
@@ -131,7 +131,7 @@
   list-style: none;
   background: var(--tf-line);
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xs);
+  border-radius: var(--pxs-radius-xs);
   overflow: hidden;
 }
 .tf-about-stat {
@@ -187,7 +187,7 @@
   list-style: none;
   background: var(--tf-line);
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xs);
+  border-radius: var(--pxs-radius-xs);
   overflow: hidden;
 }
 .tf-about-member {
@@ -207,7 +207,7 @@
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid var(--tf-line-strong);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: linear-gradient(#ffffff12, #ffffff05), var(--tf-plate);
 }
 .tf-about-member-mark:before {
@@ -240,12 +240,12 @@
 }
 .tf-about-member-bio {
   margin: .8rem 0 0;
-  color: var(--pl-text-muted);
+  color: var(--pxs-text-muted);
   font-size: .8rem;
   line-height: 1.7;
 }
 
-/* 招聘条（对应 pipellm about 的 WE'RE HIRING 横条） */
+/* 招聘条（对应原站 about 页的 WE'RE HIRING 横条） */
 .tf-about-hiring {
   position: relative;
   display: grid;
@@ -256,7 +256,7 @@
   padding: 1.15rem 1.4rem;
   overflow: hidden;
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xs);
+  border-radius: var(--pxs-radius-xs);
   background: linear-gradient(#ffffff08, #ffffff03), var(--tf-plate-glass);
 }
 .tf-about-hiring:before {
@@ -287,7 +287,7 @@
 }
 .tf-about-hiring-copy {
   margin: 0;
-  color: var(--pl-text-muted);
+  color: var(--pxs-text-muted);
   font-size: .8rem;
   line-height: 1.55;
 }
@@ -376,7 +376,7 @@
   min-height: 7.4rem;
   padding: 1.05rem 1rem 1.15rem;
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: var(--tf-plate-glass);
   transition: border-color .3s, background-color .3s;
 }
@@ -451,7 +451,7 @@
 .tf-about-milestone-copy {
   max-width: 15rem;
   margin: .6rem 0 0;
-  color: var(--pl-text-muted);
+  color: var(--pxs-text-muted);
   font-size: .82rem;
   line-height: 1.65;
 }

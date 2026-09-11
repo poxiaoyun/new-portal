@@ -16,10 +16,10 @@
 
 版式来源
 --------
-https://www.pipellm.ai/blog 与 /blog/<slug>。与 about 页一样，这一页**几乎不需要
-新写样式**：pipellm 列表页的 `.tf-blog-index-*` 与详情页的 `.tf-blog-detail-*`
+原站的 /blog 与 /blog/<slug>（换牌前的那套模板）。与 about 页一样，这一页**几乎不需要
+新写样式**：原站列表页的 `.tf-blog-index-*` 与详情页的 `.tf-blog-detail-*`
 整份都在本站的 `assets/css/vendor.css` 里 —— 上游那份样式表换牌时被一起搬了过来，
-只是首页从来没引用过这批类名。所以做法是照 pipellm 的 DOM 骨架搭结构、类名原样用，
+只是首页从来没引用过这批类名。所以做法是照原站的 DOM 骨架搭结构、类名原样用，
 样式自动继承；`assets/css/blog.css` 只补上游靠 Tailwind 工具类做、而本站没有
 Tailwind 的那些属性（整页容器底色、以及 vendor 里缺的 `.prose table`）。
 
@@ -40,7 +40,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mdrender  # noqa: E402
 from portal_page import (ARROW, ARROW_S, Ctx, derive, esc, ext,  # noqa: E402
-                         finish_many, match_close)
+                         finish_many, match_close, upstream_brand)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTENT_DIR = os.path.join(ROOT, 'content', 'blog')
@@ -59,7 +59,7 @@ READ_LABEL = '阅读全文'
 DIVIDER_CODE = 'const next = await fetch("https://api.poxiaoshi.cn/blog");'
 
 # ------------------------------------------------------------ 详情页文案
-# 「更多动态_ / 继续阅读。」对应 pipellm 详情页的「More from PipeLLM_ / Keep reading.」。
+# 「更多动态_ / 继续阅读。」对应原站详情页的「More from …_ / Keep reading.」。
 RELATED_OVERLINE = '更多动态_'
 RELATED_HEADING = '继续阅读。'
 RELATED_ID = 'related-insights'
@@ -360,11 +360,13 @@ def main():
         if doc.find('tf-blog-index-page') < m.end():
             ctx.miss.append('list: the page container must sit inside <main>')
     for leftover in ('Our Blog', 'Explore Our Latest Insights', 'Get Started',
-                     'PipeLLM', 'pipellm.ai', 'Cover image', 'reading time',
+                     'Cover image', 'reading time',
                      'agent-memory-next-bottleneck', 'context-engineering-for-ai-agents',
                      'why-unified-llm-gateway'):
         if leftover in doc:
             ctx.miss.append('list: leftover: ' + leftover)
+    if upstream_brand(doc):
+        ctx.miss.append('list: leftover: 上游品牌名')
     if re.search(r'alt="(Agent memory|Context engineering|Unified LLM)', doc):
         ctx.miss.append('list: reused the stale English alt text from the homepage cards')
 
@@ -430,10 +432,11 @@ def main():
         elif ppos != sorted(ppos):
             ctx.miss.append('%s: sections are out of order' % slug)
         # 上游残留
-        for leftover in ('PipeLLM', 'pipellm.ai', 'PipeLLM Blog', 'More from',
-                         'Keep reading', 'Read article', 'assets-cdn.pipellm.ai'):
+        for leftover in ('More from', 'Keep reading', 'Read article'):
             if leftover in d:
                 ctx.miss.append('%s: leftover: %s' % (slug, leftover))
+        if upstream_brand(d):
+            ctx.miss.append('%s: leftover: 上游品牌名' % slug)
         # 新标签页只在站外出现。详情页的链接全是站内（分类胶囊 / 相关阅读），
         # 正文里若出现站外链接则应当有 target —— 这里只断「站内链接带 target」。
         for href in re.findall(r'href="(/blog/[^"]+)" target=', d):

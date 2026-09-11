@@ -143,6 +143,9 @@ leftover 断言；`AiIRouter` 改回去 → 报 `leftover copy: AiIRouter`。
 `tools/build.py` 里那三条资源映射保留无害：该脚本的输入 `dom.html` 与输出
 `../xiaoshi-cloud/` 都已不存在，是条彻底失效的历史流水线（输出目录也不在 new-portal，
 它对应的是更早的换牌目录），那三条是死引用。
+**（2026-09-11 晚补记：`tools/build.py` 连同它读的两份上游快照
+`tools/ref/dom.html` / `tools/ref/<上游样式表>.css` 已在品牌清理里整体删除，
+这条「保留无害」的结论随之作废 —— 死引用没有了，死管道也没有了。）**
 
 ## 8. 2026-09-11 晚（二）：AIRouter 品牌写法统一
 
@@ -206,7 +209,7 @@ leftover 断言；`AiIRouter` 改回去 → 报 `leftover copy: AiIRouter`。
 ## 9. 2026-09-11 晚（三）：导航「关于我们」三项调整 + 新建 `/contact`
 
 用户要求：①「开源项目」改为跳转 https://www.kubegems.io/ ；②删除「加入我们」栏目；
-③按 https://www.pipellm.ai/contact 的样式完善「联系我们」栏目，内容取自
+③按原站（换牌前的参考站）的 /contact 样式完善「联系我们」栏目，内容取自
 https://www.poxiaoshi.cn/contact/ ，表单用 web3forms、地图用腾讯地图。
 
 ### 9.1 导航下拉：两份都要改
@@ -243,15 +246,16 @@ https://www.poxiaoshi.cn/contact/ ，表单用 web3forms、地图用腾讯地图
 
 ### 9.2 `/contact` 页：样式几乎全现成
 
-pipellm.ai/contact 实际返回的是首页（该站没有独立联系页），但**版式不用猜**：
+原站的 /contact 实际返回的是首页（原站没有独立联系页），但**版式不用猜**：
 vendor.css 里已经躺着整套 company 组件族 —— `.tf-company-contact-layout`
 （`minmax(0,1.35fr) minmax(18rem,.65fr)` 两栏）、`-form`、`-aside`、`-message`、
 `.tf-company-form-success` / `-error`、`.tf-company-kicker` / `-section` 全都有规则，
-`tools/ref/pipellm.css` 是最初的来源。这是「换牌站点的 vendor.css 里可能已有现成组件」
+最初来源就是原站那份样式表（`tools/ref/` 里的备份已在 2026-09-11 品牌清理时删除）。
+这是「换牌站点的 vendor.css 里可能已有现成组件」
 的又一例：写页面前第一件事就是 grep vendor.css。
 
 于是新增的只有三块（`assets/css/contact.css`）：
-1. 把 pipellm 的品牌橙换成本站调色板（`.tf-company-contact-form button` 从实心橙
+1. 把原站的品牌橙换成本站调色板（`.tf-company-contact-form button` 从实心橙
    改成白底深字，对齐 `.tf-button-primary`；aside 渐变改成 `--tf-rune-4`）
 2. 补 vendor 没覆盖的：页首、联系方式行、地图容器、地图降级卡
 3. 表单的校验态与结果槽位
@@ -671,7 +675,8 @@ eq('the two marks keep the same bar geometry at 2:1', /* hub 的 height 恒为 n
 用户原话：
 
 > 现在为顶部栏产品下面的4个子产品生产独立的子页面，样式参考
-> https://www.pipellm.ai/runtime 页面，保持样式，内容根据你对 Rune 大产品的理解来填充。
+> 原站的 /runtime 页面，保持样式，内容根据你对 Rune 大产品的理解来填充。
+> （引文里的参考站域名已随 2026-09-11 品牌清理隐去，本文件内其余同类引文同此处理。）
 
 ### 13.1 产物与工具链
 
@@ -683,7 +688,7 @@ eq('the two marks keep the same bar geometry at 2:1', /* hub 的 height 恒为 n
 | `tools/portal_page.py` | 新增 `PRODUCT_NAV_GROUP` 常量（产品子页把 `is-active` 挪到「产品」触发键） |
 | `tools/build_all.py` | `PIPELINE` 加 `build_products.py`（必须在 `reshape_home.py` 之后，它也从 `index.html` 取站芯） |
 
-**版式不是新写的**：`pipellm.ai/runtime` 那一页的组件族本就在 `vendor.css` 里
+**版式不是新写的**：原站 /runtime 那一页的组件族本就在 `vendor.css` 里
 （`tf-runtime-*` 42 个类 + `tf-capability-*` 卡片族 + `tf-section-*` 版面壳），
 生成器只按那页的顺序把它们拼起来 —— 做新产品页的第一件事是 `grep` 组件族，
 不是先写 CSS。

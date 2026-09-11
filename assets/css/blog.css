@@ -2,8 +2,8 @@
    =========================================================================
 
    这两个页面不需要任何新组件样式：版式用的是 vendor.css 里**已经预置**的
-   `.tf-blog-index-*`（列表）与 `.tf-blog-detail-*`（详情）。那两批类名是上游
-   PipeLLM 博客的原始命名，换牌时整份样式表被一起搬了过来，只是本站首页从未
+   `.tf-blog-index-*`（列表）与 `.tf-blog-detail-*`（详情）。那两批类名是原站
+   博客的原始命名，换牌时整份样式表被一起搬了过来，只是本站首页从未
    引用过它们（首页的博客预览区用的是第三套 `.tf-blog-*`、`.tf-blog-card`）。
 
    所以本文件只补两类东西：
@@ -22,7 +22,7 @@
    `bg-[#111111]` 由 vendor.css 的 `.tf-blog-index-page{background:#111}` 提供，
    不用管；`min-h-screen` 与 `text-white` 没有对应的组件规则，补在下面。
 
-   一句实情：本站的底色其实另有出处 —— `#root > .pipellm-surface`（站芯的一部分，
+   一句实情：本站的底色其实另有出处 —— `#root > .pxs-surface`（站芯的一部分，
    `background:#111` + `text-white` + `min-h-screen`）。所以这两条是**防御性**的：
    只要 page 容器还嵌在站芯里就跟不写一样；万一将来它被移到别处，这两条保证它
    仍然自带底色契约，不会突然变成浅底白字或短一截。
@@ -34,7 +34,7 @@
    二、已经核对过、不需要处理的两件事
    ------------------------------------------------------------------
 
-   * 站芯的 `.pipellm-hero-bg`（首页 hero 那层 dither 底图，`top:7.25rem`、高
+   * 站芯的 `.pxs-hero-bg`（首页 hero 那层 dither 底图，`top:7.25rem`、高
      `34.75rem`）在内容页也一样铺在 <main> 上方。blog hero 自带一张同源的 dither
      图，`inset:0` 铺满 38rem 高的 shell，DOM 又晚于它，所以整片 hero 都被自己的
      图盖住；只有 hero 之下那 4rem 的重叠区会露出它的尾部 —— 而那段恰好是
@@ -54,7 +54,7 @@
 
    vendor.css 的 `.tf-blog-detail-richtext .prose` 覆盖了标题 / 段落 / 列表 /
    引用 / 代码 / 行内代码 / 图片与图注，**唯独没有 `table`** —— 上游博客正文里
-   没有表格，pipellm 靠 Tailwind typography 的 `.prose` 默认值兜底；本站不引
+   没有表格，原站靠 Tailwind typography 的 `.prose` 默认值兜底；本站不引
    Tailwind，表格会完全裸奔（无边框、无内边距、列挤在一起）。
 
    本站 5 篇正文里有 3 张表：`2026-03-27-aliyun-ppu` 的参数对比表（5 列 7 行）与

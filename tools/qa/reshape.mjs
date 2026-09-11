@@ -4,7 +4,7 @@
 //   node tools/qa/reshape.mjs http://127.0.0.1:8899/index.html
 //
 // Asserts the story structure that reshape_home.py establishes, so a later
-// hand-edit or a re-run of build.py cannot silently drop a board again.
+// hand-edit or a generator re-run cannot silently drop a board again.
 import { readFileSync } from 'node:fs';
 import { session } from './cdp.mjs';
 
@@ -236,15 +236,22 @@ const probe = `(() => {
     ids: $$('section[id]').map((e) => e.id),
     docW: document.documentElement.scrollWidth,
     innerW: window.innerWidth,
-    leftover: ['PipeLLM', 'pipellm.ai', 'AI Router', 'ChatBox', 'XMCP',
-      'Moha · AI 资产仓库', '每一份资产都可追溯', '看清谁在什么时候访问了什么',
-      // the XCMP capability band was removed on 2026-09-11 pm
-      'XCMP · 云管理能力', '把多云真正用成一朵云。',
-      // footer status pill + ICP placeholder, dropped on 2026-09-11 pm
-      '所有服务运行正常', '蜀ICP备',
-      // the reference page's generic approval story, retired with the Moha pass
-      '一次越权访问被策略拦截']
-      .filter((k) => document.body.innerText.includes(k)),
+    leftover: [
+      // 上游残留文案（探针只读 innerText，所以这里查的是可见文字）
+      ...['AI Router', 'ChatBox', 'XMCP',
+        'Moha · AI 资产仓库', '每一份资产都可追溯', '看清谁在什么时候访问了什么',
+        // the XCMP capability band was removed on 2026-09-11 pm
+        'XCMP · 云管理能力', '把多云真正用成一朵云。',
+        // footer status pill + ICP placeholder, dropped on 2026-09-11 pm
+        '所有服务运行正常', '蜀ICP备',
+        // the reference page's generic approval story, retired with the Moha pass
+        '一次越权访问被策略拦截']
+        .filter((k) => document.body.innerText.includes(k)),
+      // 上游品牌名哨兵 —— 与 tools/portal_page.py 的 UPSTREAM_BRAND_RE 同一份判据。
+      // 写成正则而不是字面量：既咬得住品牌名被拆成两个词的变体，也让这个名字
+      // 在仓库里归零（哨兵不能自己是那唯一的命中项）。
+      ...(/pipe\s*llm/i.test(document.body.innerText) ? ['上游品牌名'] : []),
+    ],
   };
 })()`;
 const evaluated = await page.rpc('Runtime.evaluate', { expression: probe, returnByValue: true });

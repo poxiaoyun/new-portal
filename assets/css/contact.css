@@ -1,13 +1,14 @@
 /* =========================================================================
    联系我们（/contact/）
    -------------------------------------------------------------------------
-   骨架几乎全在 vendor.css 里。联系页用的是一套 pipellm 的 company 组件族，
-   换牌时随样式表一起搬了过来、首页却从未引用过（第一件事就是 grep vendor.css：
+   骨架几乎全在 vendor.css 里。联系页用的是一套原站（换牌前的那套模板）的
+   company 组件族，换牌时随样式表一起搬了过来、首页却从未引用过（第一件事就是
+   grep vendor.css：
    `.tf-company-contact-layout` / `-form` / `-aside` / `-message`、
    `.tf-company-form-success` / `-error`、`.tf-company-kicker`、`.tf-company-panel`
    都已经有规则）。所以这里只做三件事：
 
-     1) 把 pipellm 的品牌橙（#ff8a3d / #ff7f2d）换成本站调色板 —— 联系页在
+     1) 把原站的品牌橙（#ff8a3d / #ff7f2d）换成本站调色板 —— 联系页在
         公司级页面里，与 about 页同用 --tf-rune 这一支；
      2) 补 vendor 没覆盖的：页首、联系方式行、地图容器、地图降级卡；
      3) 表单的校验态与提交结果（.tf-company-form-error / -success 由 JS 切换）。
@@ -72,12 +73,12 @@
 .tf-contact-hero-chips svg { width: .92rem; height: .92rem; }
 
 /* ------------------------------------------------------------ vendor 换色 */
-/* 提交按钮：vendor 给的是 pipellm 的实心橙。本站的按钮体系里 primary 是
+/* 提交按钮：vendor 给的是原站的实心橙。本站的按钮体系里 primary 是
    白底深字（.tf-button-primary），这里对齐它，避免页面上出现第二种主按钮语言。 */
 .tf-company-contact-form button {
   background: #fff;
   border-color: #ffffffe6;
-  color: var(--pl-text-inverse);
+  color: var(--pxs-text-inverse);
 }
 .tf-company-contact-form button:hover { background: #dcdce0; }
 .tf-company-contact-aside {

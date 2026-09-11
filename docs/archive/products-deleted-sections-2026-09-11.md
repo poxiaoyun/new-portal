@@ -267,7 +267,7 @@ def closing(p):
 
 用户原话：「删除四个子产品的 tf-product-hero-badge」。它不是一个段落，是页首左栏
 最上面那个 mono 小胶囊（例：`核心产品 · Rune 智算`，右侧一个强调色圆点）——
-上游 `pipellm.ai/runtime` 页左上角那个 chip 的位置。
+上游原站 /runtime 页左上角那个 chip 的位置。
 
 ## 1. 渲染代码（`tools/build_products.py` 的 `hero()`，逐字）
 
@@ -310,7 +310,7 @@ def closing(p):
   gap: 0.5rem;
   padding: 0.42rem 0.72rem;
   border: 1px solid var(--tf-line-strong);
-  border-radius: var(--pl-radius-pill, 999px);
+  border-radius: var(--pxs-radius-pill, 999px);
   background: #ffffff0a;
   color: rgba(255, 255, 255, 0.66);
   font-family: var(--font-mono);

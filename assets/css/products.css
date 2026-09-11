@@ -1,7 +1,7 @@
 /* =========================================================================
    产品子页（/products/rune/ · /products/moha/ · /products/ai-router/ · /products/boss/）
    -------------------------------------------------------------------------
-   版式语言取自上游 pipellm.ai/runtime 那一页：左侧文案 + 右侧深色控制台面板，
+   版式语言取自原站 /runtime 那一页：左侧文案 + 右侧深色控制台面板，
    mono 小标签。**组件不是新写的**：
 
      .tf-runtime-console / -bar / -dots / -status / -label / -console-footer
@@ -171,7 +171,7 @@
   margin: 1.25rem 0 0;
   padding: 0.78rem 0.95rem;
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: #0000008f;
   color: rgba(255, 255, 255, 0.84);
   font-family: var(--font-mono);

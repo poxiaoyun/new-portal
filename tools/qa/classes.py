@@ -46,12 +46,27 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 from links import discover_pages  # noqa: E402  页面发现规则与 links.py 共用一套
 
-# 本来就**没有** CSS 规则的名字（精确匹配）。
-# 只登记**当前页面上真的用到**的钩子：留着命不中的条目会一直报 stale，
-# 逼人做两难选择。真用到时脚本会报出来，再往这里加一行即可。
+# 本来就**没有** CSS 规则的名字（精确匹配）：{名字: (为什么它不需要 CSS, 依据文件)}
+#
+# 「依据」是这里的防呆核心，别填成一个顺手看起来对的文件名。
+# 这些条目免掉的是幽灵类检查，而幽灵类检查是全仓**唯一**会追问「这个 class 到底
+# 有没有人用」的地方 —— 豁免一旦基于错误的前提，死类名就能在它下面长期潜伏。
+#
+# 2026-09-11 实证：`hover-scramble` 以「main.js 的打字机效果钩子」被登记到这里
+# （理由看着完全合理），而 main.js 里从来没有这个字符串。它的真身只是生成器写在
+# 页脚链接上的一个空壳 —— 21 条链接带着它，动效从未实现，hover 时只有颜色变化。
+# 它一路安然无恙，因为唯一会追问的检查被它自己的豁免挡住了，直到用户报
+# 「下拉和页脚的文字不动」才被翻出来。
+#
+# 所以每条都必须写明名字真正出现在哪个文件，脚本会打开那个文件核对。
+# 只登记**当前页面上真的用到**的钩子：命不中的条目会一直报 stale。
 EXACT_HOOKS = {
-    'hover-scramble',     # main.js 的打字机效果钩子
-    'tf-thinking-track',  # main.js 的思考流进度条
+    # 生成器给 hero 终端的 SVG 画的那个 circle。它没有 CSS 规则，也没有任何 JS
+    # 引用 —— 名字在这里出现只是为了给那个元素一个语义标记，样式全由内联属性
+    # (stroke / fill) 承担。真要让它动起来，改的是生成器里的内联属性或另加 CSS，
+    # 不要指望这个 class。
+    'tf-thinking-track': ('生成器写死的 SVG 装饰标记，无 CSS 也无 JS 引用',
+                          'tools/reshape_home.py'),
 }
 
 # 同样没有 CSS 的**前缀**族
@@ -114,6 +129,27 @@ def hook_of(token, used):
     return None
 
 
+def verify_hooks(root):
+    """核对每条豁免的依据：名字必须真的出现在它声称的那个文件里。
+
+    理由是**写下的那句**（「main.js 的钩子」）与实际不符时，这里就会响 ——
+    而不是等到几个月后有人发现某个动效从来没生效过。
+    """
+    problems = []
+    for name, (note, source) in sorted(EXACT_HOOKS.items()):
+        try:
+            with open(os.path.join(root, source), encoding='utf-8') as fh:
+                text = fh.read()
+        except OSError as exc:
+            problems.append('%s: 依据文件读不到 —— %s（%s）' % (name, exc, source))
+            continue
+        if name not in text:
+            problems.append('%s: 依据是 %s，那个文件里却没有这个名字。'
+                            '登记的理由是「%s」—— 理由与事实不符，'
+                            '这个豁免掩盖的是不是真问题？' % (name, source, note))
+    return problems
+
+
 def check(root=ROOT, quiet=False):
     pages = discover_pages(root)
     if not pages:
@@ -146,8 +182,11 @@ def check(root=ROOT, quiet=False):
 
     # 白名单里没人命中的条目 = 已经过期的豁免，留着会掩盖真问题
     stale = sorted(h for h, n in used.items() if n == 0)
+    # 还有人命中的豁免也要查依据：命中只说明「产物里写了这个 class」，
+    # 不说明「它真的有人用」—— 死类名照样会被命中。
+    unbacked = verify_hooks(root)
 
-    if problems or stale:
+    if problems or stale or unbacked:
         print('PROBLEMS:')
         for rel, ghosts in problems:
             print('  ! %s' % rel)
@@ -155,6 +194,8 @@ def check(root=ROOT, quiet=False):
                 print('       %s' % token)
         for name in stale:
             print('  ! stale hook whitelist entry: %s — 没有任何 class 命中它' % name)
+        for msg in unbacked:
+            print('  ! 豁免的依据对不上: %s' % msg)
         print()
         if problems:
             print('  上面那些 class 在任何样式表里都没有规则 —— vendor.css 是上游')
@@ -165,6 +206,10 @@ def check(root=ROOT, quiet=False):
             print('      （PREFIX_HOOKS 加之前先确认整族都是钩子）')
         if stale:
             print('  白名单里的 stale 条目没人用了就直接删掉 —— 留着会掩盖真报错。')
+        if unbacked:
+            print('  豁免的依据必须是**真的**：写「main.js 的钩子」就得能在那个文件里')
+            print('  找到这个名字。名字只在生成器里出现、却在产物里到处挂着，说明它')
+            print('  没有使用者 —— 要么给它真实现（CSS 或 JS），要么把 class 摘掉。')
         return 1
 
     if not quiet:

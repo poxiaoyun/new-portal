@@ -390,7 +390,7 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   width: 2.8rem;
   height: 2.8rem;
   border: 1px solid var(--tf-line-strong);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: var(--tf-plate);
 }
 /* size only — the shared mono treatment lives with `.tf-icon-hero.center img`
@@ -421,7 +421,7 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 .tf-control-harness-chips span {
   padding: .45rem .62rem;
   border: 1px solid var(--tf-boss-36);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: var(--tf-boss-8);
   color: #ffd9b0d9;
   font-family: var(--font-mono);
@@ -449,7 +449,7 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   flex-direction: column;
   padding: 0;
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xs);
+  border-radius: var(--pxs-radius-xs);
   background: var(--tf-plate-glass);
   overflow: hidden;
 }
@@ -462,7 +462,7 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 .tf-boss-metric {
   padding: .75rem .8rem;
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: #ffffff06;
 }
 .tf-boss-metric b {
@@ -479,7 +479,7 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 .tf-boss-table {
   margin: 1.15rem 1.5rem 0;
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xxs);
+  border-radius: var(--pxs-radius-xxs);
   background: #0d0e10c7;
   overflow: hidden;
 }
@@ -579,8 +579,8 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   padding: clamp(1rem, 1.8vw, 1.35rem);
   background: linear-gradient(#ffffff13, #ffffff07), var(--tf-plate-glass);
   border: 1px solid var(--tf-line);
-  border-radius: var(--pl-radius-xs);
-  box-shadow: var(--pl-shadow-panel);
+  border-radius: var(--pxs-radius-xs);
+  box-shadow: var(--pxs-shadow-panel);
 }
 @media (max-width: 767px) {
   .tf-section-split > .tf-managed-api-code-panel { padding: 1rem; }

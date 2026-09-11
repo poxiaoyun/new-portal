@@ -43,6 +43,24 @@ COMPANY_NAV_GROUP = 'class="tf-nav-product tf-nav-company"'
 # 首页 nav 里「产品」这一组。产品子页（/products/*/）把 is-active 挪到它身上。
 PRODUCT_NAV_GROUP = 'class="tf-nav-product tf-nav-product-menu"'
 
+# 上游品牌名的**回归哨兵**：产物里绝不能再出现它 —— 这是「换牌清理」的底线，
+# 五个内容页生成器共用同一份判据，免得各写各的、各漏各的
+# （tools/reshape_home.py 与 tools/qa/reshape.mjs 各有一份等价实现，
+#   前者不依赖本模块，后者是 JS）。
+#
+# 之所以写成正则而不是字面量，两个原因：
+#   1) 顺带咬住品牌名被写成两个词（中间带空格/换行）的变体，比子串匹配强；
+#   2) 这个名字本身不该再落在仓库里 —— 全仓搜它必须归零，
+#      哨兵不能是那唯一的命中项。
+# 改这条判据时别图省事换成字面量。
+UPSTREAM_BRAND_RE = re.compile(r'pipe\s*llm', re.I)
+
+
+def upstream_brand(doc):
+    """命中的上游品牌原文，没有则返回 None。"""
+    m = UPSTREAM_BRAND_RE.search(doc)
+    return m.group(0) if m else None
+
 
 class Ctx(object):
     """一次生成过程的账本：缺失项与已应用项。"""
@@ -299,7 +317,7 @@ def derive(ctx, out_rel, title, description, extra_css, main_markup,
     # ------------------------------------------------- 结构守卫（所有内容页共用）
     if '<html lang="zh-CN"' not in doc:
         ctx.miss.append('html lang lost')
-    for marker in ('pipellm-navbar-shell', 'tf-nav-product-menu', 'tf-nav-company-dropdown',
+    for marker in ('pxs-navbar-shell', 'tf-nav-product-menu', 'tf-nav-company-dropdown',
                    'tf-reference-footer', 'tf-footer-columns', 'tf-nav-dropdown-icon'):
         if marker not in doc:
             ctx.miss.append('lifted chrome missing: ' + marker)

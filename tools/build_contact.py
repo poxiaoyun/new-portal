@@ -4,7 +4,7 @@
 
 样式来源
 --------
-版式照 pipellm.ai 的 company 组件族（用户指定的参考站），但那套 class 换牌时已经
+版式照原站（用户指定的参考站）的 company 组件族，但那套 class 换牌时已经
 随 vendor.css 一起搬进本仓库了 —— 第一件事就是 grep vendor.css：
 `.tf-company-contact-layout` / `-form` / `-aside` / `-message`、
 `.tf-company-form-success` / `-error`、`.tf-company-kicker` / `-section` 全都有规则。
@@ -59,7 +59,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from portal_page import (ARROW_S, Ctx, brand_action, code_divider, derive, esc,  # noqa: E402
-                         ext, finish, overline, reveal)
+                         ext, finish, overline, reveal, upstream_brand)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -441,9 +441,11 @@ def main():
     elif pos != sorted(pos):
         ctx.miss.append('sections are out of order: ' + str(list(zip(order, pos))))
     # 站内不该出现的旧品牌 / 上游残留
-    for leftover in ('PipeLLM', 'pipellm.ai', 'src="assets/', 'ant-form', 'ant-btn'):
+    for leftover in ('src="assets/', 'ant-form', 'ant-btn'):
         if leftover in doc:
             ctx.miss.append('leftover / bad path: ' + leftover)
+    if upstream_brand(doc):
+        ctx.miss.append('leftover: 上游品牌名')
 
     # 凭据状态：缺失只 WARN 不失败 —— 本机没有 Secret 是常态，页面照常可预览。
     # 缺 web3forms key 是「表单收不到」而不是「页面坏」；缺地图 key 只是退到降级卡。
