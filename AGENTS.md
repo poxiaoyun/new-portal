@@ -141,6 +141,6 @@ upload）都不能动；`Stage` 是白名单 + 反向自查，加东西时**对�
 - 页脚巨型 wordmark 的字号仍按旧的 7 字调（现为 5 字，居中留白偏大）
 - Pages 的 **Enforce HTTPS** 尚未勾选（`http://` 不跳 `https://`）
 - 各页守卫密度不均
-- SEO 产物侧已齐备（canonical / og / JSON-LD / robots / sitemap / 分享图），
-  但**站长后台那一步还没做**：三个 `*_SITE_VERIFICATION` Secret 未配置，
-  sitemap 也还没在 Google / 百度 / Bing 提交过 —— 这一步只能人工做
+- SEO 产物侧已齐备（canonical / og / JSON-LD / robots / sitemap / 分享图）；归属验证
+  改走 DNS TXT 完成（Google / Bing，2026-09-12），页面里**不输出**验证 meta，百度那条
+  已删除。剩下只有「在 GSC / Bing 提交 sitemap」这一步人工动作

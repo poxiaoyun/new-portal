@@ -56,6 +56,9 @@ og 的消费方（微信、X、Facebook、Slack 的抓取器）不保证解析�
   （CI 的 checkout 也只有 1 层历史）。
 * 不做百度主动推送。它要么需要服务端 token，要么往页面里塞一段会回连第三方的
   JS —— 后者是产品决策（性能与隐私），不替用户拍。见 README 的说明。
+* 不输出站长平台的归属验证 meta（`<meta name="google-site-verification">` 那一类）。
+  归属验证走 DNS TXT，与产物无关；理由与「要加回来时该改哪三处」见下面
+  「站长平台的归属验证刻意不在这里」那段。
 """
 
 import html
@@ -103,16 +106,18 @@ ROBOTS_NOINDEX = 'noindex, follow'
 # 主题色（移动端地址栏 / 部分社交卡片的底色）。取 --tf-plate。
 THEME_COLOR = '#0d0e10'
 
-# 站长平台的归属验证码：meta 名 -> 环境变量名。
+# 站长平台的**归属验证刻意不在这里**。
 #
-# 它们**不是凭据**（本来就要出现在 HTML 里给人看），但也不该由生成器凭空编一个：
-# 编出来的值会让站长平台里挂着一个永远验不过的校验，比不输出更坏。所以走构建期
-# 注入，未配置就**整条不输出**。三个平台各要一次（验证码在各自的站长后台里拿）。
-VERIFICATION = (
-    ('google-site-verification', 'GOOGLE_SITE_VERIFICATION'),
-    ('baidu-site-verification', 'BAIDU_SITE_VERIFICATION'),
-    ('msvalidate.01', 'BING_SITE_VERIFICATION'),
-)
+# 走的是 DNS TXT 记录（在域名解析侧加一条，与页面无关），Google 与 Bing 都已完成
+# （2026-09-12）。这里曾经有一组 `<meta name="…-site-verification">` 的构建期注入，
+# 已删除，两条理由：
+#   1. DNS 验证与产物解耦：改版、换生成器、重出产物都不会让它失效。而 meta 验证
+#      一旦某次重构漏掉那个标签，站长后台就掉回「未验证」，收录报告 / sitemap
+#      提交 / 抓取诊断会一起锁死 —— 一个只能靠「记得别删」维持的标签不该承担它。
+#   2. 那套机制需要三个 Secret，而「配了没配」在产物上的差别只有在站长后台看得
+#      出来，本地零症状（当时只能靠在 CI 里打 warning 提醒）。
+# 若将来要加回某个平台的验证标签，**三处一起改**：这里输出 + tools/qa/seo.py 的
+# 必查项 + workflow 的缺失告警。只加输出不加守卫，就是把上面那个坑原样埋回去。
 
 # JSON-LD 里跨页面互相引用的实体 id。Organization 与 WebSite 只在首页定义，
 # 其余页面用 @id 指过去 —— 这是 schema.org 的标准做法，Google 会跨页解析。
@@ -390,11 +395,7 @@ def seo_block(title, description, url, *, kind='webpage', image=None, image_alt=
     meta('name', 'twitter:image', abs_url(image))
     meta('name', 'twitter:image:alt', image_alt)
 
-    # 站长平台验证码：配置了才输出（见文件顶部 VERIFICATION 的说明）。
-    for meta_name, env in VERIFICATION:
-        value = (os.environ.get(env) or '').strip()
-        if value:
-            meta('name', meta_name, value)
+    # 归属验证的 meta 标签不在这里输出 —— 走 DNS TXT，见文件顶部那段说明。
 
     graph = []
     if not noindex:

@@ -2,10 +2,8 @@ name: Deploy to GitHub Pages
 
 # 本站是「生成器 + 提交产物」的静态站：页面由 tools/*.py 从快照派生后入库。
 # 所以 CI 这里做四件事，缺一不可（顺序也是硬依赖，见各步自己的注释）：
-#   1. 守住源码里没有明文凭据（在构建**之前**跑，构建会把凭据写进产物），
-#      顺带把「站长平台验证码没配」这件事报成 warning
-#   2. 重跑生成器，用 Secret 注入 contact 页的 web3forms key、腾讯地图 key，
-#      以及三家站长平台的验证码
+#   1. 守住源码里没有明文凭据（在构建**之前**跑，构建会把凭据写进产物）
+#   2. 重跑生成器，用 Secret 注入 contact 页的 web3forms key 与腾讯地图 key
 #   3. 只把可发布的那几个文件与目录传成 dist/（tools/ content/ docs/ 不上线），
 #      然后反向自查一遍「仓库里有的东西是不是都进清单了」
 #   4. 把 SITE_BASE 前缀注入 dist/（夹在「staged」与「upload」之间 —— 早于 stage
@@ -16,16 +14,15 @@ name: Deploy to GitHub Pages
 #
 # 需要的仓库 Secret（Settings → Secrets and variables → Actions）：
 #
-#   WEB3FORMS_ACCESS_KEY           web3forms 的 access key
-#   TENCENT_MAP_KEY                lbs.qq.com 的地图 key
-#   GOOGLE_SITE_VERIFICATION       Google Search Console 的验证码
-#   BAIDU_SITE_VERIFICATION        百度搜索资源平台的验证码
-#   BING_SITE_VERIFICATION         Bing 网站管理员工具的验证码
+#   WEB3FORMS_ACCESS_KEY   web3forms 的 access key
+#   TENCENT_MAP_KEY        lbs.qq.com 的地图 key
 #
-# 五项**未配置都不失败**，各自的降级后果见下面两步里的 warning。
-# 前两项是凭据（只在产物里出现，源码里不许有）；后三项不是凭据（本来就要
-# 印在 HTML 里给人看），但它们同样不能由生成器凭空编一个 —— 编出来的值会让
-# 站长后台挂着一个永远验不过的校验，比不输出更坏，所以也是构建期注入。
+# 两项**未配置都不失败**：表单退到占位符、地图退到降级卡，各自在下面打一条
+# warning。它们都是凭据 —— 只在产物里出现，源码里不许有。
+#
+# 站长平台的归属验证**不经过这里**：Google 与 Bing 都走 DNS TXT 记录，与产物无关
+# （2026-09-12 已完成）。这里曾经有一组 `*_SITE_VERIFICATION` Secret 用来在页面里
+# 输出验证 meta，已连同那个缺失告警步骤一起删除 —— 理由见 tools/seo.py 顶部。
 
 on:
   push:
@@ -47,11 +44,6 @@ jobs:
     env:
       WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
       TENCENT_MAP_KEY: ${{ secrets.TENCENT_MAP_KEY }}
-      # 三家搜索引擎的站长平台归属验证码。空值 = 对应 meta 整条不输出
-      # （tools/seo.py 的 VERIFICATION 只渲染有值的那些）。
-      GOOGLE_SITE_VERIFICATION: ${{ secrets.GOOGLE_SITE_VERIFICATION }}
-      BAIDU_SITE_VERIFICATION: ${{ secrets.BAIDU_SITE_VERIFICATION }}
-      BING_SITE_VERIFICATION: ${{ secrets.BING_SITE_VERIFICATION }}
       # 部署前缀。**必须与 Pages 的实际域名配置一致** ——
       #   绑了自定义域名（cname 非空）→ 站点在域名根 → 这里留空
       #   没绑域名（项目页）        → 站点在 /<repo>/ 子路径 → 这里是 /<repo>
@@ -99,25 +91,6 @@ jobs:
             fi
           done
           exit "${failed}"
-
-      # 缺验证码不会让构建失败，但后果在本地完全看不见：产物里没有对应的
-      # <meta>，三家站长后台的「验证网站归属」会一直过不去 —— 而收录报告、
-      # sitemap 提交、抓取诊断全都锁在那一步后面。所以至少要让它出声。
-      # 仍然不因为缺它就 exit 1：站点本身是好的，不该被一个可选配置卡住发布。
-      # 用 ${VAR:-}，理由同上一步。
-      - name: Report missing search-console verification codes
-        run: |
-          set -uo pipefail
-          for pair in \
-            "Google Search Console=${GOOGLE_SITE_VERIFICATION:-}" \
-            "百度搜索资源平台=${BAIDU_SITE_VERIFICATION:-}" \
-            "Bing 网站管理员工具=${BING_SITE_VERIFICATION:-}"
-          do
-            if [ -z "${pair#*=}" ]; then
-              echo "::warning::${pair%%=*} 的验证码未配置 —— 产物里不会有对应的 meta 标签，该平台的「验证网站归属」会一直过不去"
-            fi
-          done
-          exit 0
 
       - name: Build site (injects credentials from secrets)
         run: python3 tools/build_all.py

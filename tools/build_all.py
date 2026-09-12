@@ -25,9 +25,8 @@ build_seo.py 排在最后：它要清点**全部**页面（走 qa/links.py 的 d
     WEB3FORMS_ACCESS_KEY    未设置时 form 用占位符，只 WARN 不失败
     TENCENT_MAP_KEY         未设置时地图退到代理模式，只 WARN 不失败
     SITE_URL                canonical / og:url / sitemap 的规范主机，默认线上真值
-    GOOGLE_SITE_VERIFICATION / BAIDU_SITE_VERIFICATION / BING_SITE_VERIFICATION
-                            三家站长平台的归属验证码，未设置则对应 meta 整条不输出
-                            （编一个假值会让控制台挂着一个永远验不过的校验，更坏）
+站长平台的**归属验证不在这里** —— Google 与 Bing 走 DNS TXT，与产物无关
+（2026-09-12 已完成）。详见 seo.py 顶部那段留白说明。
 本地想用真值预览，写进仓库根 .env.local（已 gitignore）。
 
 用法：

@@ -65,13 +65,12 @@ python3 tools/build_all.py --check  # 只跑静态体检，不重建
 | `TENCENT_MAP_KEY` | 联系页地图 | 退到降级卡 |
 | `SITE_BASE` | 部署前缀，见下文 | 默认按域名根 |
 | `SITE_URL` | canonical / `og:url` / sitemap 的规范主机，见 [SEO](#seo-与搜索引擎) | 默认 `https://www.poxiaoshi.cn` |
-| `GOOGLE_SITE_VERIFICATION` | Google Search Console 归属验证 | 少一条 meta，控制台验不过 |
-| `BAIDU_SITE_VERIFICATION` | 百度搜索资源平台归属验证 | 同上 |
-| `BING_SITE_VERIFICATION` | Bing 网站管理员工具归属验证 | 同上 |
 
-后四个都**不是凭据**（`SITE_URL` 是配置，三个验证码本来就要印在 HTML 里给人看），
-但它们同样不能由生成器凭空编一个：编出来的值会让站长后台挂着一个永远验不过的
-校验，比不输出更坏。所以走「构建期注入、未配置则整条不输出」。
+后两个不是凭据，但同样不该由生成器凭空编一个：`SITE_BASE` 编错是全站链接 404，
+`SITE_URL` 编错是把搜索引擎指向一个不提供这份内容的主机。
+
+站长平台的**归属验证不在这张表里** —— Google 与 Bing 都走 DNS TXT 记录，与页面产物
+无关（2026-09-12 已完成），页面里不输出任何 `*-site-verification` meta。
 
 本地想用真值预览，写进仓库根 `.env.local`（已 gitignore）。
 
@@ -145,31 +144,39 @@ python3 tools/gen_og.py --only blog       # 只渲染某一类（default/blog/pr
 `og:image:width/height` 现读 PNG/JPEG 文件头；sitemap 与 `qa/links.py` 共用同一套
 页面发现算法并**双向对账**（互查有没有对方没有的页）。
 
-### 三家搜索引擎
+### 搜索引擎
 
-产物侧齐了之后，剩下的动作在站长后台，各平台的入口与提交物：
+**归属验证走 DNS TXT 记录** —— 在域名解析侧加一条，与页面产物完全解耦。Google 与
+Bing 都已完成（2026-09-12），页面里**不输出**任何 `<meta name="…-site-verification">`。
 
-| 平台 | 验证方式 | 要提交 |
-| --- | --- | --- |
-| Google Search Console | `GOOGLE_SITE_VERIFICATION`（HTML 标记） | `https://www.poxiaoshi.cn/sitemap.xml` |
-| 百度搜索资源平台 | `BAIDU_SITE_VERIFICATION`（HTML 标记） | 同上，并在「普通收录 → sitemap」提交 |
-| Bing 网站管理员工具 | `BING_SITE_VERIFICATION` | 同上；也可直接从 GSC 导入 |
+这是刻意的选择，不是遗漏：DNS 验证不会因为改版、换生成器、重出产物而失效；而 meta
+验证一旦某次重构漏掉那个标签，站长后台就悄悄掉回「未验证」，收录报告 / sitemap 提交
+/ 抓取诊断会一起锁死 —— 那个标签只能靠「记得别删」维持。百度那条已删除（不为它做
+站长平台适配，可见性走下面的被动发现）。
+
+产物侧（`robots.txt` + `sitemap.xml` + canonical）齐备之后，只剩一件人工动作：把
+
+```
+https://www.poxiaoshi.cn/sitemap.xml
+```
+
+提交给 Google Search Console 与 Bing 网站管理员工具（Bing 也可直接从 GSC 导入）。
+各家的爬虫本来就能靠 `robots.txt` 里的 sitemap 指针找到它，提交只是让收录开始得更快。
 
 `robots.txt` **刻意不写任何 `Disallow`** —— 整站没有登录墙、付费墙，也没有不该抓的
 目录，写了就得维护一份清单。它只声明 `Allow: /` 与 sitemap 地址。
 
-**不做百度主动推送。** 它要么需要服务端 token，要么往页面里塞一段会回连第三方的
-JS（后者是性能与隐私上的产品决策，不替用户拍）。目前走被动收录：sitemap + 正常的
-`robots.txt`，百度自己的爬虫会按这两者发现页面。
+**不做任何主动推送**（百度推送、IndexNow 都没有）。前者要么需要服务端 token，要么
+往页面里塞一段会回连第三方的 JS；后者要求把 key 放进站点根。两者都是把「收录」的
+触发权交给站外，收益不确定而维护面确定。目前走被动发现：`sitemap.xml` + 正常的
+`robots.txt`，各家的爬虫会按这两者自行发现页面。
 
 ## 部署
 
 `.github/workflows/deploy-pages.yml`，push 到 `main` 触发。**五步顺序都不能动：**
 
 1. **Guard** —— 扫源码里有没有明文凭据。必须在 Build **之前**（构建会把凭据写进产物）。
-   顺带把「站长平台验证码没配」报成 warning（缺它不会失败，但三家控制台的归属验证
-   会一直过不去 —— 那个失败在本地完全看不见）。
-2. **Build** —— `python3 tools/build_all.py`，用 Secret 注入凭据与验证码。
+2. **Build** —— `python3 tools/build_all.py`，用 Secret 注入凭据。
 3. **Stage** —— 只把可发布的文件与目录复制进 `dist/`。清单是**白名单 + 反向自查**：
    正向清单漏项的表现是「什么都没发生」，所以还要反过来问一次「仓库里有、清单里
    没有的东西有哪些」。反向自查覆盖两类 —— 含页面的目录（按 `index.html` 找）和
@@ -183,8 +190,10 @@ JS（后者是性能与隐私上的产品决策，不替用户拍）。目前走
    前缀。夹在 Stage 与 upload 之间：早于 Stage 时 `dist/` 还不存在，晚于 upload 时
    artifact 已经打包好了。
 
-`SITE_BASE` 必须与 Pages 域名配置一致（第 4 步两个方向都查，症状都是「点任何链接
-都 404」）。期望值取自 Pages API 而不是产物本身 —— 产物自证不了自己的域名。
+`SITE_BASE` 与 `SITE_URL` 都必须与 Pages 的实际域名配置一致（第 4 步核对）。这两处
+写错的症状完全不同：`SITE_BASE` 错是「点任何链接都 404」（很显眼），`SITE_URL` 错则
+本地全绿、页面全好 —— 只是 canonical / `og:url` / JSON-LD 把搜索引擎指向一个不再
+提供这份内容的主机。期望值取自 Pages API 而不是产物本身 —— 产物自证不了自己的域名。
 
 **只改 `dist/`，源码语义不动。** 全部生成器与体检脚本都建立在「站点根 == 域名根」这个
 假设上，产出根相对链接；一旦发布在子路径下，只在这一步改写产物。
