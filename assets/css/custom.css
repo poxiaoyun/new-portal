@@ -56,9 +56,35 @@
   --tf-plate-glass: #08090be6;
 }
 
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+/* -------------------------------------------------------------------------
+   滚动到边界时的底板（overscroll canvas）
+   
+   vendor.css 给 body 铺的是浅色 #f5f5f7（换牌前那套亮色主题的残留），而这一版
+   页面的深色其实由 .pxs-surface 这个**子容器**画。于是深色之下没有兜底：滚动到
+   顶部/底部发生过界（触控板与移动端的橡皮筋、桌面端的滚动链）时，深色容器被推离
+   视口，露出来的就是 canvas 上的 #f5f5f7 —— 视觉上是一条约 58px 的白条。
+   
+   三处一起写才有效，缺一不可：
+   - html / body 都显式铺深色。html 一旦有了背景，body 的背景就不再传播到 canvas，
+     所以**两个都要写** —— 只改 html 会留下 body 盒子自己那块浅色。
+   - overscroll-behavior-y: none —— 断掉滚动链与回弹（桌面端与 Android 生效）。
+   - color-scheme: dark —— 让浏览器按深色渲染文档之外的区域（滚动条、过界区域的
+     默认底色）。这一条是移动端下拉露白的关键。
+   iOS Safari 的 rubber-band 能否被禁取决于版本；但即使它回弹，拉出来的也是深色。
+   不要改 vendor.css —— 那是编译产物，覆盖只发生在这里。
+------------------------------------------------------------------------- */
+html {
+  background-color: var(--tf-plate);
+  color-scheme: dark;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-body { font-family: var(--font-sans); }
+body {
+  background-color: var(--tf-plate);
+  font-family: var(--font-sans);
+}
 
 /* CJK glyphs are wide: relax the tight Latin tracking in headings */
 h1, h2, h3, .tf-section-title, .tf-runtime-story h2 { letter-spacing: -.012em; }
