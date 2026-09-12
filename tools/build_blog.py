@@ -331,18 +331,25 @@ def main():
     )
 
     # 列表页守卫：条数与内容源一致，且每条三处链接都指向**本地**详情页
+    #
+    # 数的是 `<main>` 里那一份，不是整页。顶部公告条（站芯，在 <main> 之外）从
+    # 2026-09-12 起放的就是公司动态的**标题**，每条还各带一个指向详情页的 href；
+    # 拿整页当范围时，「每条三处链接」会变成 3 + 轨道重复份数，而且标题的
+    # 「在不在页面上」被轨道保底 —— 那两条守卫会**同时**失去意义（一条误报、
+    # 一条静默失效）。_main_html 的 docstring 讲的就是这件事。
+    main = _main_html(doc)
     if doc.count('tf-blog-index-snippet"') != len(posts):
         ctx.miss.append('snippets on the page: %d, want %d'
                         % (doc.count('tf-blog-index-snippet"'), len(posts)))
     for p in posts:
         for needle in (p['title'], p['date'], p['tag']):
-            if esc(needle) not in doc:
+            if esc(needle) not in main:
                 ctx.miss.append('list: post field lost: %s' % needle)
         # 封面 / 标题 / 按钮三处。`(?! target)` 保证没被 ext() 当成外链开新窗口。
-        got = len(re.findall(r'href="%s"(?! target=)' % re.escape(p['href']), doc))
+        got = len(re.findall(r'href="%s"(?! target=)' % re.escape(p['href']), main))
         if got != 3:
             ctx.miss.append('list: local link count for %s: %d, want 3' % (p['slug'], got))
-        if 'href="%s" target=' % p['href'] in doc:
+        if 'href="%s" target=' % p['href'] in main:
             ctx.miss.append('list: %s still opens in a new tab (should stay in-site)'
                             % p['slug'])
         if '%s/%s' % (NEWS_DIR, os.path.basename(p['cover'])) not in doc:
@@ -412,11 +419,15 @@ def main():
 
         # --- 本页专属守卫 ------------------------------------------------
         rel = 'blog/%s/index.html' % slug
+        # 同列表页：这三条也只看 <main>。公告条会把本篇标题、以及全部动态的
+        # `/blog/<slug>/` 链接一起搬进站芯，用整页数就会「相关阅读 22 张卡」
+        # 「相关阅读指回自己」这类误报，同时让「标题在不在」失去意义。
+        dmain = _main_html(d)
         if d.count('tf-blog-detail-page"') != 1:
             ctx.miss.append('%s: page container count %d' % (slug, d.count('tf-blog-detail-page"')))
         # 标题与摘要逐字落盘
         for needle in (esc(post['title']), esc(post['tag']), esc(post['summary'])):
-            if needle not in d:
+            if needle not in dmain:
                 ctx.miss.append('%s: hero field lost' % slug)
         if '<title>%s</title>' % esc('%s | %s' % (post['title'], SITE_NAME)) not in d:
             ctx.miss.append('%s: <title> not rewritten' % slug)
@@ -438,7 +449,7 @@ def main():
         if '%s/%s' % (NEWS_DIR, os.path.basename(post['cover'])) not in d:
             ctx.miss.append('%s: cover not linked' % slug)
         # 相关阅读：恰好 RELATED_COUNT 篇，且都不指向自己
-        rel_cards = re.findall(r'href="(/blog/[^"]+)"', d)
+        rel_cards = re.findall(r'href="(/blog/[^"]+)"', dmain)
         # 每个 related 卡片一次 + 分类胶囊一次（/blog，无尾斜杠，不匹配）
         if len(rel_cards) != RELATED_COUNT:
             ctx.miss.append('%s: related cards %d, want %d'

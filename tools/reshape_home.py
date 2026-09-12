@@ -21,6 +21,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import announce  # noqa: E402
 import seo  # noqa: E402
 
 REF = 'tools/ref/index.before-reshape.html'
@@ -47,6 +48,11 @@ HOME_TITLE_OG = '破晓石科技 | Rune Harness 云智算内核'
 # 用正则而非字面量：既咬得住品牌名被写成两个词（带空格）的变体，也让
 # 全仓搜它归零 —— 哨兵不能自己是那唯一的命中项。
 UPSTREAM_BRAND_RE = re.compile(r'pipe\s*llm', re.I)
+
+# 顶部公告条的轨道容器。子节点里只有 <a> 与一个零宽占位，没有嵌套 div，所以
+# 非贪婪取到的第一个 </div> 就是容器自己的收尾。它的两个消费方是
+# body_without_announcement()（数次数的守卫要把它摘掉）与 announcement_guard()。
+TRACK_RE = re.compile(r'<div class="tf-announcement-track"[^>]*>(.*?)</div>', re.S)
 
 
 # --------------------------------------------------------------- utilities
@@ -347,7 +353,7 @@ def seo_guard():
         MISS.append('seo: the svg icon must come after the png one')
 
 
-def body_without_seo():
+def body_without_seo(doc=None):
     """整页除去 head 里那块 SEO 标签。
 
     **只给两类守卫用：数出现次数、查「还有没有指向旧站的链接」。** 两边都是
@@ -362,8 +368,96 @@ def body_without_seo():
 
     反面同样要注意：**查「不该出现的文案」时必须用整页 body，不能摘 SEO 块** ——
     那一块里的文案也是文案，旧品牌名漏进 og:title 一样是回归。
+
+    `doc` 默认当前 `body`；要叠加多层剥离时把上一层的结果传进来
+    （例：`body_without_seo(body_without_announcement())`）。
     """
-    return seo.SEO_BLOCK_RE.sub('', body)
+    return seo.SEO_BLOCK_RE.sub('', body if doc is None else doc)
+
+
+def body_without_announcement(doc=None):
+    """整页除去顶部公告条的轨道内容（容器的开闭标签留着）。
+
+    **只给「数这个文案/这个链接在页面里出现几次」的守卫用。** 公告条是站芯，条目
+    来自内容源（公司动态的标题），所以同一段文字与同一批 href 会在轨道里按重复份数
+    出现多遍。2026-09-12 把公告条内容换成动态标题之后，两条计数守卫立刻被打红：
+
+      * 首页「AIRouter · AI聚合网关」数了 16 条 —— 其中 10 条是换牌时的公告文案；
+      * 每张博客卡的 `/blog/<slug>/` 从 1 处变 5 处 —— 轨道里恰好在放那几篇的标题。
+
+    两处都不是「多写了」，是**同一批内容在站芯里的副本**被数进了正文。
+    反面同样：查公告条**自己**的东西（标签、条目、可循环性）时必须用轨道原文，
+    见 announcement_guard()。
+    """
+    return TRACK_RE.sub('<div class="tf-announcement-track"></div>',
+                        body if doc is None else doc, count=1)
+
+
+# 轨道容器的开标签在文件顶上（TRACK_RE）—— 它与 body_without_announcement() 是
+# 一对，别把定义搬到这里就以为只有 announcement_guard 在用。
+def announcement_guard():
+    """顶部公告条：标签、条目出处、以及跑马灯那两个「坏了也照常渲染」的约束。
+
+    公告条是**站芯**的一部分，所以这里查的是「它有没有忠实反映内容源」。其中最需要
+    守卫的是轨道的可循环性 —— 它坏掉的样子是「每 82 秒在循环处跳一下」，肉眼得盯着
+    看才可能发现，而构建、三个静态体检、链接闭环**全都不会出声**。
+    """
+    m = TRACK_RE.search(body)
+    if not m:
+        MISS.append('announcement: 找不到 .tf-announcement-track 容器')
+        return
+    raw = m.group(1)
+
+    # 标签。用整页 body 而不是 body_without_seo()：「不该出现的文案」正是要连
+    # SEO 块一起查的那一类（body_without_seo 的 docstring 末尾有说明）。
+    if '新品' in body:
+        MISS.append('announcement: 旧标签「新品」仍在页面里 %d 处' % body.count('新品'))
+    if '<b>%s</b>' % announce.LABEL not in raw:
+        MISS.append('announcement: 轨道里没有 <b>%s</b> 标签' % announce.LABEL)
+
+    # 轨道里除条目外只允许那个零宽占位 —— 它是 -50% 位移对齐用的，见 announce.SPACER。
+    # 多出任何别的东西，下面按「锚点等距」做的整套推断就不再成立。
+    anchors = re.findall(r'<a\b[^>]*>.*?</a>', raw, re.S)
+    rest = re.sub(r'<a\b[^>]*>.*?</a>', '', raw, flags=re.S)
+    if rest != announce.SPACER or not raw.endswith(announce.SPACER):
+        MISS.append('announcement: 轨道里除 <a> 之外应当只有一个位于**末尾**的零宽占位，'
+                    '实际剩余 %r' % rest[:120])
+    if not anchors:
+        MISS.append('announcement: 轨道里一条条目都没有')
+        return
+
+    # 无缝的前提：恰好两个逐字节相同的半。
+    if len(anchors) % 2:
+        # `-50%%`：消息里那个百分号是 CSS 的字面量，不转义会被 % 格式化吃掉，
+        # 于是这条守卫从「报错」变成「抛 TypeError」—— 守卫自己崩掉比不报还坏。
+        MISS.append('announcement: 轨道有 %d 条锚点（奇数）—— 动画是 translate(-50%%)，'
+                    '轨道必须恰好是两个相同的半' % len(anchors))
+    half = len(anchors) // 2
+    if anchors[:half] != anchors[half:]:
+        MISS.append('announcement: 轨道的两个半不一致 —— 循环处会跳一下')
+
+    # 条目必须来自内容源，**逐条比**。期望侧现读 content/blog/ 与
+    # content/announcements.md，不是把生成时用的那份抄过来 —— 抄过来的话，
+    # 内容源改坏了也照样全绿。
+    want = [announce.anchor(text, href) for text, href in announce.items()]
+    if anchors[:len(want)] != want:
+        MISS.append('announcement: 轨道首轮条目与内容源不符（轨道共 %d 条，内容源 %d 条）'
+                    % (len(anchors), len(want)))
+        for i, (got, exp) in enumerate(zip(anchors, want), start=1):
+            if got != exp:
+                MISS.append('  #%d 产物 %r  !=  内容源 %r' % (i, got[:96], exp[:96]))
+                break
+    if len(want) and len(anchors) % len(want):
+        MISS.append('announcement: 轨道 %d 条不是内容源条目数 %d 的整数倍'
+                    % (len(anchors), len(want)))
+    elif want and anchors != anchors[:len(want)] * (len(anchors) // len(want)):
+        MISS.append('announcement: 轨道不是「一轮条目」的原样重复')
+
+    # 链接要在任何深度上都对。站芯会在 depth=0/1/2 的页面上逐字节复用，相对路径
+    # 在其中两层上必然是错的 —— 而它只在点下去的时候才露馅。
+    for href in re.findall(r'<a href="([^"]*)"', raw):
+        if not (href.startswith('/') or href.startswith('http')):
+            MISS.append('announcement: 条目链接 %r 既不是站点根相对也不是绝对地址' % href)
 
 
 def section_span(anchor, lo=0):
@@ -1019,11 +1113,9 @@ def stage_hero():
     need('✔ 多云已纳管', '✔ 模型调用已授权', 'hero terminal ok')
     need('→ 配额与计费就绪', '→ 用量已计量入账', 'hero terminal info')
 
-    need('Rune 2.6 正式发布：训推一体流水线支持英伟达与国产 GPU 异构算力池，多租户配额与弹性伸缩同步上线。'
-         '   ·   破晓石完成阿里云 PPU 适配，国产加速卡正式纳入 Rune 调度。',
-         'Rune 智算 / Moha 资产 / AIRouter · AI聚合网关 / BOSS 运营，四大板块共享一个云智算内核。'
-         '   ·    Rune Harness 云智算内核进入规划：统一会话、诊断、变更审批与执行追踪。',
-         'announcement')
+    # 公告条原本在这里换文案。现在整条轨道由 stage_announcement() 重建
+    # （标签 + 条目，见 tools/announce.py），这里不再兼职 —— 同一段标记两处都改
+    # 的话，谁最后跑谁赢，而这件事在产物上完全看不出来。
 
     # The centre terminal drops its upstream command/result lines and replays a
     # Rune Harness conversation instead (see HERO_CHAT). The neighbouring
@@ -1649,21 +1741,23 @@ def stage_contact_retarget():
 
 
 def stage_blog_cards():
-    """首页博客预览区三张卡 + 顶部公告条：把指向线上的链接收回站内。
+    """首页博客预览区三张卡：把指向线上的链接收回站内。
 
     2026-09-11 把 `/blog` 做成**自持内容**之后（列表页 + 5 个详情页，内容源在
     `content/blog/*.md`，见 tools/build_blog.py），首页就不该再跳到 poxiaoshi.cn
     —— 这个站点的目的正是替换 poxiaoshi.cn。
 
     三张卡原先的 href 是换牌时留下的上游博客 slug，三个都是本站不存在的死链：
-    `/blog/agent-memory-next-bottleneck` 等等；`alt` 也还是那批英文。公告条那 10 个
-    副本（marquee 横向滚动需要把同一段重复多份）指向线上 `/blog/`，一并收回。
+    `/blog/agent-memory-next-bottleneck` 等等；`alt` 也还是那批英文。
 
     目标 slug 是**从每张卡自己的标题读出来的**，不是另抄一份顺序表——将来换掉某张卡
     时，href 与标题必须一起改，这里的三元组就是那个约束。
 
     封面同理：图名不再写在这里，而是从内容源的 `cover:` 读（见 post_cover），
     与详情页共用同一张图。
+
+    （顶部公告条原本也在这里收回站内链接；2026-09-12 起整条轨道由
+    stage_announcement() 重建，见 tools/announce.py。）
     """
     global body
     # (换牌遗留的上游 slug, 本站 slug, 旧英文 alt, 新中文 alt,
@@ -1708,14 +1802,22 @@ def stage_blog_cards():
             need1(old_frame, old_frame.replace('tf-blog-image-frame ',
                                                'tf-blog-image-frame is-wide-art '),
                   'blog card frame -> is-wide-art (' + slug + ')')
-    # 公告条：整条 <aside class="tf-announcement-bar"> 里的轨道副本
-    ann = 'href="https://www.poxiaoshi.cn/blog/"'
-    count = body.count(ann)
-    if count == 0:
-        MISS.append('miss: announcement bar blog links')
-    else:
-        body = body.replace(ann, 'href="/blog"')
-        applied['announce bar -> /blog'] = count
+
+
+def stage_announcement():
+    """顶部公告条：标签换成 `New:`，条目换成公司动态标题 + 手写扩展。
+
+    整条轨道一次换掉，而不是在快照那份标记上做局部替换。快照里是 10 份**一模一样的**
+    副本（marquee 靠重复填满轨道），文案与标签都嵌在每一份里；与其逐份改文案再换标签，
+    不如把子节点整个重建 —— 内容真源本来就在 tools/announce.py。
+
+    轨道有两个硬约束（两个逐字节相同的半、半宽 ≥ 视口宽），都由 announce.track_html()
+    算好；它们的**守卫**在 announcement_guard() 里对着产物再验一遍，因为这两个约束
+    坏了以后页面照常渲染，只是循环处会跳一下或露出空白。
+    """
+    global body
+    fill_children('class="tf-announcement-track"', announce.track_html(),
+                  key='announcement track')
 
 
 def stage_guards():
@@ -1926,25 +2028,30 @@ def stage_guards():
                      '</span>AIRouter · AI聚合网关</span>'):
         if required not in body:
             MISS.append('missing: ' + required)
-    # 品牌写法 2026-09-11 统一后，首页全称该出现 16 次：title 1 + meta 1 +
-    # 跑马灯 10（无缝滚动把同一条文案复制成 10 份）+ hero pill 1 + 控制平面 lane 1 +
-    # 板块 overline 1 + footer 产品列 1。少一处是某个 stage 漏改，多一处是旧写法
-    # 没清干净 —— 这条计数比逐个 required 更能兜住「只改了一半」。
+    # 品牌写法 2026-09-11 统一后，首页全称该出现 6 次：title 1 + meta 1 +
+    # hero pill 1 + 控制平面 lane 1 + 板块 overline 1 + footer 产品列 1。
+    # 少一处是某个 stage 漏改，多一处是旧写法没清干净 —— 这条计数比逐个 required
+    # 更能兜住「只改了一半」。
+    #
+    # 这个 16 曾经是 16：换牌时的公告文案里就有一份「AIRouter · AI聚合网关」，
+    # 轨道把同一条文案复制 10 份，于是 6 + 10 = 16。2026-09-12 公告条改成放公司动态的
+    # 标题之后那 10 份没了，**计数器没变、期望值必须跟着变** —— 所以这里同时摘掉
+    # 轨道（body_without_announcement），让期望值不再依赖「公告条里恰好写什么」。
     #
     # 计数前先把乱码宿主的重复副本摘掉：一条文字链接包成宿主后，同一份文本在
-    # measure / live / sr-only 里各出现一次，页脚那条会让计数从 16 涨到 18 ——
-    # 那是动效的结构开销，不是品牌写法多写了一处。剥掉可见的两份（两份都
-    # aria-hidden），留 sr-only 那份代表这一处「锁定的文案」。
+    # measure / live / sr-only 里各出现一次，页脚那条会让计数涨 —— 那是动效的结构
+    # 开销，不是品牌写法多写了一处。剥掉可见的两份（两份都 aria-hidden），留
+    # sr-only 那份代表这一处「锁定的文案」。
     #
     # 再剥掉 head 里那块 SEO 标签（body_without_seo）：它把 title 与 description
     # 又渲染了四次（og:title / og:description / twitter:title / twitter:description），
-    # 不剥就是 20。两处都是**结构开销**，不是「品牌写法多写了」。
+    # 不剥就是 10。两处都是**结构开销**，不是「品牌写法多写了」。
     countable = re.sub(
         r'<span class="tf-scramble-(?:measure|live)"[^>]*>[^<]*</span>',
-        '', body_without_seo())
+        '', body_without_seo(body_without_announcement()))
     got = countable.count('AIRouter · AI聚合网关')
-    if got != 16:
-        MISS.append('expected sixteen `AIRouter · AI聚合网关` lockups on the homepage, got %d'
+    if got != 6:
+        MISS.append('expected six `AIRouter · AI聚合网关` lockups on the homepage, got %d'
                     % got)
     # 「关于我们」下拉：桌面与移动抽屉各 4 项（原 5 项，见 stage_nav_company）。
     # 逐项断言 node-id 而不是数个数 —— 删一项时若删除范围越界吃了紧随其后那一项，
@@ -1968,7 +2075,11 @@ def stage_guards():
     # 定价区「查看完整报价」与「查看商务条款」；再加晚（十三）商务收口的四条
     # （导航 CTA「联系销售」、移动抽屉「联系销售」、页脚「联系我们」「联系销售」）。
     # 落点全是同一个 /contact，所以按总数咬住。
-    got = body.count('href="/contact"')
+    #
+    # 数的是 body_without_announcement()：手写扩展条目可以指向任何地方（`/contact`
+    # 尤其像公告的落点），而同一份条目在轨道里有重复份数。不摘掉轨道，这条断言的
+    # 期望值就要跟着「公告条里恰好写什么」走 —— 那不是它想守的东西。
+    got = body_without_announcement().count('href="/contact"')
     if got != 11:
         MISS.append('站内 /contact 应有十一处（桌面 + 抽屉 + 页脚图标 + 品牌带 + 页尾 CTA '
                     '+ 定价区两条 + 商务收口四条），实得 %d' % got)
@@ -2082,7 +2193,10 @@ def stage_guards():
             MISS.append('页脚 %s 的链接没了（node-id %s）' % (label, nid))
         elif got != new_href:
             MISS.append('页脚 %s 应指向 %s，实得 %s' % (label, new_href, got))
-    got = body.count('href="/blog/"')
+    # 摘掉轨道再数：「/blog/」正是手写扩展条目很可能选的落点（「查看全部动态」之类），
+    # 而这条想守的是页脚那两条行业案例。不摘的话，用户往公告条里加一条
+    # `| /blog/` 就会得到「页脚两条行业案例应指 /blog/，实得 3」这种指错方向的报错。
+    got = body_without_announcement().count('href="/blog/"')
     if got != 2:
         MISS.append('页脚两条行业案例应指 /blog/，实得 %d' % got)
     # 首页三处控制台直达已全部收归站内（品牌带 / 页尾 → /contact，BOSS 深潜 → 产品页）。
@@ -2103,9 +2217,15 @@ def stage_guards():
         MISS.append('站内链接不应开新窗，实得 %d 处: %s' % (len(offenders), offenders[:3]))
 
     # 三张博客卡各是一整块 <a>，所以每张只需一处站内链接；仍有一处指向
-    # poxiaoshi.cn 的 blog 就说明 stage_blog_cards 没生效
+    # poxiaoshi.cn 的 blog 就说明 stage_blog_cards 没生效。
+    #
+    # 数的是 body_without_announcement()：公告条放的正是公司动态的标题，那几篇的
+    # `/blog/<slug>/` 也在轨道里（按重复份数各若干处）。2026-09-12 之前轨道里写的
+    # 是「Rune 智算 / Moha 资产 / …」那种自由文案，一个博客 slug 都没有，所以这条
+    # 守卫当时用整页数是对的 —— 换成动态标题的那天它就变成「每张卡 5 处链接」。
+    ann_free = body_without_announcement()
     for slug in ('2026-03-27-aliyun-ppu', '2024-12-15-hygon', '2025-07-24-majnoon'):
-        got = body.count('href="/blog/%s/"' % slug)
+        got = ann_free.count('href="/blog/%s/"' % slug)
         if got != 1:
             MISS.append('blog card %s: %d local links, expected 1' % (slug, got))
     if 'https://www.poxiaoshi.cn/blog/' in body:
@@ -2211,12 +2331,17 @@ def stage_guards():
     # 所以这里看到的与它们搬走的是同一份。
     seo_guard()
 
+    # 顶部公告条。放在最后：它的条目由 stage_announcement() 整条重建，
+    # 而期望值现读内容源，所以要等所有 stage 都跑完再对账。
+    announcement_guard()
+
 
 for fn in (stage_head, stage_icons, stage_seo,
            stage_nav, stage_nav_menu, stage_nav_company, stage_hero,
            stage_story, stage_xcmp,
            stage_rune_moha, stage_moha, stage_airouter, stage_boss, stage_harness,
-           stage_pricing, stage_faq, stage_blog_cards, stage_footer_cta,
+           stage_pricing, stage_faq, stage_blog_cards, stage_announcement,
+           stage_footer_cta,
            stage_contact_retarget,
            # 必须排在 stage_footer_cta 与 stage_contact_retarget 之后：前者把
            # 「产品」列整段换掉、后者会改写页脚链接的开标签，这一遍要在两者都

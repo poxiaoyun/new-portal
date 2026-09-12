@@ -44,6 +44,7 @@ node tools/qa/page.mjs    http://127.0.0.1:8899/index.html
 | 内容页（about / blog / contact / products / 404） | 对应的 `tools/build_*.py`；公共派生逻辑进 `portal_page.py` |
 | 样式 | `assets/css/custom.css` 或各页样式表；`pxs-*` 类与 `--pxs-*` 令牌在 `vendor.css` |
 | 博客正文 | `content/blog/<slug>.md`，然后 `python3 tools/build_blog.py` |
+| 顶部跑马灯（标签 / 条目 / 手写公告） | `tools/announce.py` 是唯一真源（`LABEL` + 条目拼装），手写条目在 `content/announcements.md`；由首页的 `stage_announcement()` 整条重建，见 README「顶部公告条」 |
 | SEO（canonical / og / JSON-LD / robots / sitemap / 分享图） | `tools/seo.py` 是唯一真源，见 README「SEO 与搜索引擎」；分享图另跑 `tools/gen_og.py` 并把产物一起提交 |
 
 ## 4. 自证：改完怎么证明没改坏
@@ -79,7 +80,8 @@ node tools/qa/page.mjs    http://127.0.0.1:8899/index.html
 
 | 位置 | 管什么 |
 | --- | --- |
-| `tools/reshape_home.py` 的 `stage_guards()` | 首页：必须出现的文案/类、必须消失的旧文案/旧类、div 配平、`seo_guard()` |
+| `tools/reshape_home.py` 的 `stage_guards()` | 首页：必须出现的文案/类、必须消失的旧文案/旧类、div 配平、`seo_guard()`、`announcement_guard()` |
+| `tools/announce.py` + `announcement_guard()` | 顶部跑马灯：标签、条目是否来自内容源、轨道能否无缝循环（两个相同的半 / 半宽 ≥ 视口宽 / 半宽定滚动速度） |
 | `tools/build_*.py` 各自的 `guard` / `miss()` | 本页结构、区块顺序、站外链接、`leftover` 残留 |
 | `tools/portal_page.py` 的 `finish*()` | 站芯指纹 `chrome_fingerprint()` 与首页逐字节比对（SEO 块先整块剥掉再比） |
 | `tools/qa/links.py` | 768 条站内链接闭环 + 路径深度 |
@@ -98,6 +100,12 @@ node tools/qa/page.mjs    http://127.0.0.1:8899/index.html
    `og:image` 与 JSON-LD 的 `@id` 又天然是填了绝对地址的旧站字样。修法是
    `reshape_home.py` 里的 `body_without_seo()` —— **数次数时**先把 SEO 块剥掉，
    **查「某段文案不该出现」时**则必须用整页 body（否则会把 SEO 块里的命中漏掉）。
+   第三次是**顶部公告条**（2026-09-12 起放公司动态的标题）：它在每一页上重复若干份，
+   于是同一个标题、同一批 `/blog/<slug>/` 会出现在站芯里。**同一个改动一口气打红了
+   四条守卫，症状两种都有** —— 「每条链接 3 处变 7 处」「相关阅读 22 张卡」是误报；
+   「标题在不在页面上」被轨道保底、`main` 里其实已丢也照样绿，是静默失效。判据：
+   内容守卫数 `<main>`（`build_blog._main_html()`）或摘掉轨道
+   （`reshape_home.body_without_announcement()`），站芯守卫才数整页。
 2. **豁免名单会掩盖死代码。** 曾有豁免条目声称某类名是 main.js 的钩子，实际 main.js
    里 0 次命中 —— 那个死类名因此被瞒了很久。豁免条目一律要求附上**依据文件**，
    由脚本打开核对。

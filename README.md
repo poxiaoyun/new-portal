@@ -33,7 +33,9 @@ assets/js/main.js     全站唯一的脚本：导航 / 滚动 / 乱码动效 / �
 assets/img/*          图标、栅格纹理、客户 logo
 assets/img/og/        分享图与图标（tools/gen_og.py 渲染，见「SEO」一节）
 content/blog/*.md     博客内容源（frontmatter + 正文，本站自持）
+content/announcements.md  顶部跑马灯的手写扩展条目（可选，见「顶部公告条」一节）
 tools/*.py            页面生成器与公共库（seo.py 是 SEO 标签的唯一真源）
+tools/announce.py     顶部跑马灯的内容真源（动态标题 + 手写扩展）
 tools/ref/*.html      首页的 pristine 快照 —— reshape_home.py 的输入，别删
 tools/qa/            体检脚本（静态三支 + 浏览器三支）
 docs/                 设计评审与历史留档，**不上线**
@@ -100,6 +102,50 @@ node tools/qa/reshape.mjs http://127.0.0.1:8899/index.html    # 首页结构 / �
 node tools/qa/page.mjs    http://127.0.0.1:8899/index.html    # 零报错 / 资源 / 四档视口溢出
 node tools/qa/page.mjs    http://127.0.0.1:8899/index.html --shots tmp/shots
 ```
+
+## 顶部公告条（跑马灯）
+
+每一页顶部那条横向滚动的公告，内容真源是 `tools/announce.py`：
+
+| 组成 | 来源 |
+| --- | --- |
+| 标签 `New:` | `announce.LABEL` |
+| 公司动态的标题（最新 8 条） | `content/blog/*.md`，经 `build_blog.load_posts()` 取 |
+| 手写扩展条目 | `content/announcements.md` 的 `## 条目` 一节（可选） |
+
+自动那半**不在别处再抄一份**：改了某篇动态的 `title:`，公告条与 `/blog` 列表页一起变。
+要加一条公告就编辑 `content/announcements.md`，一行一条 `- 正文 | /链接`（链接可省，
+省了指向 `/blog`），然后重跑构建。格式细节与上限见该文件头部。
+
+### 它不是「往快照里换文案」，是整条轨道重建
+
+公告条属于**站芯**：在首页产出，13 个内容页由 `portal_page.derive()` 整篇搬走。所以
+它里面不能有任何逐页差异 —— 一旦有，`chrome_fingerprint()` 会报「站芯漂移」，而那个
+报错看起来像是 derive 的锅。
+
+三条容易踩的硬约束（都由 `announce.track_html()` 算好，`announcement_guard()` 对着
+产物再验一遍）：
+
+1. **轨道必须是两个逐字节相同的半。** 动画是 `translate(0) → translate(-50%)`
+   （`vendor.css` 的 `@keyframes tf-announcement-scroll`），百分比位移按元素自身宽度
+   算，两个半不一致就会在循环处跳一下。
+2. **半宽 ≥ 视口宽**（`.tf-announcement-viewport` 最宽 1280px），且内容宽度要盖过轨道
+   自带的 `min-width:200%` —— 否则 -50% 的位移与实际内容对不上，同样错位。轨道末尾那个
+   零宽 `<span>` 是给 flex 的 `gap` 补位用的，**别删**（HTML 注释代替不了它）。
+3. **半宽还决定滚动速度。** 动画时长 82s 写在 vendor.css 里，速度 = 半宽 / 82 —— 条目
+   从长文案换成短标题后，只按前两条取份数会让速度掉到原来的一半。所以份数还要满足
+   `announce.TARGET_SPEED_PX_S`（现取 70px/s，与改前同一档）。
+
+这三条坏掉的样子都只是「循环处看起来有点不对」或「跑马灯变懒了」，构建与三个静态体检
+全都不出声，所以守卫放在首页生成器里（`announcement_guard()`）。
+
+### 加了公告条之后，数 href 的守卫要收窄范围
+
+公告条在每一页上重复若干份，于是同一个标题、同一批 `/blog/<slug>/` 链接会出现在**站芯**
+里。凡是「这条文案 / 这个链接在页面里出现几次」的守卫，都得把轨道摘掉再数
+（`reshape_home.body_without_announcement()` 与 `build_blog._main_html()`），否则会得到
+两种相反的症状：**误报**（每条链接从 3 处变 7 处）或**静默失效**（标题被轨道保底，
+`main` 里其实已经丢了也照样绿）。
 
 ## SEO 与搜索引擎
 
