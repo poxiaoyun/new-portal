@@ -125,6 +125,13 @@ upload）都不能动；`Stage` 是白名单 + 反向自查，加东西时**对�
   `python urllib` 走代理会 502）；把 URL 直接映射到文件系统路径核对更稳。
 - `assets/js/main.js` 的动效钩子是**自发现**的：它扫 `.tf-scramble-label` 再
   `closest('a, button')`，不再维护容器类白名单。所以新增标签只需给钩子，不用改 JS。
+- **线上核验不能用「字节比对」。** 站点前面有 Cloudflare，它会对 HTML 做邮件混淆：
+  把邮箱改写成 `/cdn-cgi/l/email-protection#…` 并注入 `email-decode.min.js`，实测
+  首页因此比本地产物**多 1088 字节**（`robots.txt` / `sitemap.xml` 不受影响，字节一致）。
+  所以「线上 == 本地」这个判据对 HTML 永远为假，会把一次正常发布误判成全站被改。
+  正确做法是**逐标签比对**（canonical / og:* / robots / JSON-LD），本项目的标签本来就
+  都由 `tools/seo.py` 单点产出，比对得上即可。顺带：`vary: Accept-Encoding` + CDN
+  缓存意味着拿到的是压缩过的响应，`curl` 要带 `--compressed`。
 - **workflow 里的 bash 别裸写 `${VAR}`。** 步骤都是 `set -u`，而 job 级 `env:` 恰好
   把变量声明成了空串，所以 CI 里不炸、**本地演练必炸**（`unbound variable`，退出码 1，
   看上去像业务错误）。一律写 `${VAR:-}`：让「未声明」与「声明为空」走同一条路。
