@@ -613,19 +613,17 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
 }
 
 /* --------------------------------------------------------------------------
-   首页博客卡封面换源后的处理档位（2026-09-11）
-   三张卡的封面原先是为这个容器**专门生成**的近黑底亮线稿（tools/gen_blog.py，
-   文件头写明了缘由：vendor 那档 `opacity:.38 + grayscale + brightness(1.1) +
-   scale(1.3)` 会把中间调的图压成一片看不出结构的灰）。
-   现在封面改为从内容源读，与 /blog 详情页共用同一张图（实拍照片与品牌图），
-   线稿档就不再合适：照片的中频会被抬亮成灰雾，白底品牌图会整块发灰。
-   按「照片」重新定档——压低而不是抬亮，让封面沉成暗纹理；放大倍率交给
-   .is-wide-art 那一档（scale 1.04）处理。
-   若要退回线稿档，删掉下面两条属性即可。
+   首页博客卡封面（与 /blog 详情页同一张图）。
+   vendor 的 `.tf-blog-image-frame img` 是 `opacity:.38 + grayscale +
+   brightness(1.1) + scale(1.3)`，按近黑底线稿调的。封面改成实拍和产品截图
+   之后，灰阶会把界面色抽掉。这里只取消灰阶和压暗；放大倍率仍交给
+   `.is-wide-art`（scale 1.04）。hover 那条 vendor 规则特异性更高，会把
+   opacity 打回 .52，所以一并压住。
    -------------------------------------------------------------------------- */
-.tf-blog-overview .tf-blog-image-frame img {
-  opacity: .5;
-  filter: grayscale() contrast(1.05) brightness(.5);
+.tf-blog-overview .tf-blog-image-frame img,
+.tf-blog-overview .tf-blog-card:hover .tf-blog-image-frame img {
+  opacity: 1;
+  filter: none;
 }
 
 /* --------------------------------------------------------------------------

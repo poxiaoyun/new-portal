@@ -3,7 +3,7 @@
 """生成「关于我们 / 公司动态」的整条链路：
 
     content/blog/<slug>.md  ->  blog/index.html            （列表页）
-                            ->  blog/<slug>/index.html     （5 个详情页）
+                            ->  blog/<slug>/index.html     （详情页，篇数随内容源走）
 
 本站自持内容
 ------------

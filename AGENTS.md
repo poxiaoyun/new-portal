@@ -4,7 +4,7 @@
 
 ## 0. 一句话
 
-静态站，21 个产物（18 页 + `404.html` + `robots.txt` + `sitemap.xml`）由 `tools/` 的
+静态站，22 个产物（19 页 + `404.html` + `robots.txt` + `sitemap.xml`）由 `tools/` 的
 Python 生成器派生后入库；改站点 = 改生成器 + 重跑，CI 重跑生成器后发布到 GitHub Pages。
 
 ## 1. 红线

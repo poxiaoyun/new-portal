@@ -1876,9 +1876,9 @@ def stage_blog_cards():
     # (换牌遗留的上游 slug, 本站 slug, 旧英文 alt, 新中文 alt,
     #  换牌自造的旧封面, 该卡图片框的 node id)
     cards = [
-        ('agent-memory-next-bottleneck', '2026-03-27-aliyun-ppu',
+        ('agent-memory-next-bottleneck', '2026-11-02-runai-open-source-rune',
          'Agent memory architecture with semantic recall layers',
-         '破晓石完成阿里云 PPU 适配',
+         'NVIDIA 开源了 Run:ai，机房同事还在对门户和账',
          'assets/img/blog/cover-ppu.png', 'TijzkcUxPr4TrlDeNq1sfL'),
         ('context-engineering-for-ai-agents', '2024-12-15-hygon',
          'Context engineering compression pipeline for AI agents',
@@ -1915,6 +1915,18 @@ def stage_blog_cards():
             need1(old_frame, old_frame.replace('tf-blog-image-frame ',
                                                'tf-blog-image-frame is-wide-art '),
                   'blog card frame -> is-wide-art (' + slug + ')')
+
+    # 第一张卡换成最新这篇。标题和导语写在快照正文里，href / alt / 封面换了
+    # 还不够，否则卡片会拿着旧文案配上新封面。
+    need1('>破晓石完成阿里云 PPU 适配</h3>',
+          '>NVIDIA 开源了 Run:ai，机房同事还在对门户和账</h3>',
+          'blog card title -> 2026-11-02-runai-open-source-rune')
+    need1('晓石云平台完成阿里云 PPU 算力适配，Rune 训推一体平台可直接调度国产加速卡资源，'
+          '进一步降低企业 AI 基础设施的异构成本。',
+          '近日 NVIDIA 将 Run:ai 以 Apache 2.0 开源。调度层能改了，智算中心现场仍常卡在'
+          '门户、配额出账和模型统一入口。破晓石产品线 Rune AI 补的是训推门户、资产仓、'
+          '网关与运营这条链，与 Run:ai 互补多于对标。',
+          'blog card summary -> 2026-11-02-runai-open-source-rune')
 
 
 def stage_announcement():
@@ -2128,10 +2140,10 @@ def stage_guards():
                      'tf-nav-dropdown-icon"><svg class="h-4 w-4" viewBox="0 0 24 24"'
                      ' fill="none" stroke="currentColor" stroke-width="2"',
                      # the blog preview cards point at the self-hosted pages now
-                     'href="/blog/2026-03-27-aliyun-ppu/"',
+                     'href="/blog/2026-11-02-runai-open-source-rune/"',
                      'href="/blog/2024-12-15-hygon/"',
                      'href="/blog/2025-07-24-majnoon/"',
-                     'alt="破晓石完成阿里云 PPU 适配"',
+                     'alt="NVIDIA 开源了 Run:ai，机房同事还在对门户和账"',
                      # 品牌写法统一 2026-09-11：四板块并列串改用 `/` 分层
                      # （`·` 让给「主名 · 定位词」），AIRouter 段带全称。
                      # 四处独立出现的位置（hero pill / footer 产品列 / overline /
@@ -2348,7 +2360,7 @@ def stage_guards():
     # 是「Rune 智算 / Moha 资产 / …」那种自由文案，一个博客 slug 都没有，所以这条
     # 守卫当时用整页数是对的 —— 换成动态标题的那天它就变成「每张卡 5 处链接」。
     ann_free = body_without_announcement()
-    for slug in ('2026-03-27-aliyun-ppu', '2024-12-15-hygon', '2025-07-24-majnoon'):
+    for slug in ('2026-11-02-runai-open-source-rune', '2024-12-15-hygon', '2025-07-24-majnoon'):
         got = ann_free.count('href="/blog/%s/"' % slug)
         if got != 1:
             MISS.append('blog card %s: %d local links, expected 1' % (slug, got))
@@ -2357,7 +2369,7 @@ def stage_guards():
     # 三张卡的封面必须来自内容源（与详情页同图）。need1 只证明「替换发生了」，
     # 这里独立再核一遍产物里真的有那三张 —— 万一 post_cover 给回别的路径、
     # 或某一张漏渲染，这条会咬住。
-    for slug in ('2026-03-27-aliyun-ppu', '2024-12-15-hygon', '2025-07-24-majnoon'):
+    for slug in ('2026-11-02-runai-open-source-rune', '2024-12-15-hygon', '2025-07-24-majnoon'):
         cover = post_cover(slug)
         if cover and f'src="{cover}"' not in body:
             MISS.append(f'blog card cover for {slug} is absent from the page: {cover}')

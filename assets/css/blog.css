@@ -91,15 +91,32 @@
 }
 
 /* 单元格里的图。线上用「空表头 + 图片 + 粗体说明」的表格排产品截图网格，
-   所以这块不是在给数据表配图，而是在给图片网格定形。
-
-   有意不加 `filter: grayscale()`：这些是产品界面截图，要能看清细节；站内那些
-   装饰性配图（封面、hero）才走灰阶。 */
+   所以这块不是在给数据表配图，而是在给图片网格定形。 */
 .tf-blog-detail-richtext .prose td img {
   display: block;
   width: 100%;
   margin-bottom: 0.6rem;
   border: 1px solid var(--tf-line);
+}
+
+/* 内容图保持原色。
+   vendor 给列表封面、详情封面、正文 figure、相关阅读一律写了
+   `filter: grayscale()`（封面还叠了 brightness / opacity）。产品截图和实拍
+   被压成黑白后，界面上的状态色看不清。
+   装饰性 dither 底（`.tf-blog-index-hero-shell > img`、
+   `.tf-blog-detail-hero-shell > img`）仍走灰阶，那不是正文图。
+   选择器与 vendor 同形或更具体，本文件在 vendor / custom 之后加载。 */
+.tf-blog-index-image img,
+.tf-blog-index-image:hover img {
+  opacity: 1;
+  filter: none;
+}
+
+.tf-blog-detail-image img,
+.tf-blog-detail-richtext .prose figure img,
+.tf-blog-detail-related-card > img,
+.tf-blog-detail-related-card:hover > img {
+  filter: none;
 }
 
 /* 窄屏：参数对比表是 5 列，硬塞进手机的正文栏会把每列压成一两个汉字宽。

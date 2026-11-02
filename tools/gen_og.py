@@ -5,7 +5,7 @@
 产物**入库**，和 assets/img/*.webp 一样是产物而不是源码：
 
     assets/img/og-default.png              全站默认 1200x630（首页 / about / blog / contact）
-    assets/img/og/blog-<slug>.png          5 篇公司动态各一张（带封面）
+    assets/img/og/blog-<slug>.png          每篇公司动态一张（带封面）
     assets/img/og/product-<slug>.png       4 个产品各一张（带该板块强调色）
     assets/img/favicon-96.png              96x96  透明（搜索结果里的站点图标）
     assets/img/apple-touch-icon.png        180x180 透明
