@@ -102,6 +102,21 @@ def post_cover(slug):
     return cover
 
 
+def post_field(slug, key):
+    """读内容源 frontmatter 里的一个字段。首页卡的标题和导语跟详情页共用这一份。"""
+    path = os.path.join('content', 'blog', slug + '.md')
+    if not os.path.exists(path):
+        MISS.append('content source missing: ' + path)
+        return ''
+    with open(path, encoding='utf-8') as fh:
+        head = fh.read(4096)
+    m = re.search(r'(?m)^%s:\s*(.*?)\s*$' % re.escape(key), head)
+    if not m or not m.group(1):
+        MISS.append('%s missing in %s' % (key, path))
+        return ''
+    return m.group(1)
+
+
 def open_tag_end(s, idx):
     gt = s.find('>', idx)
     return -1 if gt < 0 else gt + 1
@@ -1873,12 +1888,17 @@ def stage_blog_cards():
     stage_announcement() 重建，见 tools/announce.py。）
     """
     global body
+    # 首页第一张卡是最新一篇。标题、导语、封面都从内容源读，不在这里再抄一份，
+    # 否则重跑生成器会把卡片写回上一篇。
+    featured = '2026-11-20-iluvatar-mrc-v100'
+    featured_title = post_field(featured, 'title')
+    featured_summary = post_field(featured, 'summary')
     # (换牌遗留的上游 slug, 本站 slug, 旧英文 alt, 新中文 alt,
     #  换牌自造的旧封面, 该卡图片框的 node id)
     cards = [
-        ('agent-memory-next-bottleneck', '2026-11-02-runai-open-source-rune',
+        ('agent-memory-next-bottleneck', featured,
          'Agent memory architecture with semantic recall layers',
-         'NVIDIA 开源了 Run:ai，机房同事还在对门户和账',
+         featured_title,
          'assets/img/blog/cover-ppu.png', 'TijzkcUxPr4TrlDeNq1sfL'),
         ('context-engineering-for-ai-agents', '2024-12-15-hygon',
          'Context engineering compression pipeline for AI agents',
@@ -1912,21 +1932,22 @@ def stage_blog_cards():
         # 第三张原本就带这个类，这里把前两张补齐，三张统一。
         if frame_id:
             old_frame = f'class="tf-blog-image-frame " data-page-node-id="{frame_id}"'
+            # 最新这篇的封面是带标题和 Logo 的成品海报。is-wide-art 仍有 1.04 倍
+            # 放大，会切掉左右两侧。is-poster 在 custom.css 里改成完整落入框内。
+            extra = ' is-poster' if slug == featured else ''
             need1(old_frame, old_frame.replace('tf-blog-image-frame ',
-                                               'tf-blog-image-frame is-wide-art '),
+                                               'tf-blog-image-frame is-wide-art%s ' % extra),
                   'blog card frame -> is-wide-art (' + slug + ')')
 
     # 第一张卡换成最新这篇。标题和导语写在快照正文里，href / alt / 封面换了
-    # 还不够，否则卡片会拿着旧文案配上新封面。
+    # 还不够，否则卡片会拿着旧文案配上新封面。文案从内容源读，重跑不会写回旧篇。
     need1('>破晓石完成阿里云 PPU 适配</h3>',
-          '>NVIDIA 开源了 Run:ai，机房同事还在对门户和账</h3>',
-          'blog card title -> 2026-11-02-runai-open-source-rune')
+          '>%s</h3>' % featured_title,
+          'blog card title -> ' + featured)
     need1('晓石云平台完成阿里云 PPU 算力适配，Rune 训推一体平台可直接调度国产加速卡资源，'
           '进一步降低企业 AI 基础设施的异构成本。',
-          '近日 NVIDIA 将 Run:ai 以 Apache 2.0 开源。调度层能改了，智算中心现场仍常卡在'
-          '门户、配额出账和模型统一入口。破晓石产品线 Rune AI 补的是训推门户、资产仓、'
-          '网关与运营这条链，与 Run:ai 互补多于对标。',
-          'blog card summary -> 2026-11-02-runai-open-source-rune')
+          featured_summary,
+          'blog card summary -> ' + featured)
 
 
 def stage_announcement():
@@ -2140,10 +2161,10 @@ def stage_guards():
                      'tf-nav-dropdown-icon"><svg class="h-4 w-4" viewBox="0 0 24 24"'
                      ' fill="none" stroke="currentColor" stroke-width="2"',
                      # the blog preview cards point at the self-hosted pages now
-                     'href="/blog/2026-11-02-runai-open-source-rune/"',
+                     'href="/blog/2026-11-20-iluvatar-mrc-v100/"',
                      'href="/blog/2024-12-15-hygon/"',
                      'href="/blog/2025-07-24-majnoon/"',
-                     'alt="NVIDIA 开源了 Run:ai，机房同事还在对门户和账"',
+                     'alt="破晓石完成天数智芯算力卡适配"',
                      # 品牌写法统一 2026-09-11：四板块并列串改用 `/` 分层
                      # （`·` 让给「主名 · 定位词」），AIRouter 段带全称。
                      # 四处独立出现的位置（hero pill / footer 产品列 / overline /
@@ -2360,7 +2381,17 @@ def stage_guards():
     # 是「Rune 智算 / Moha 资产 / …」那种自由文案，一个博客 slug 都没有，所以这条
     # 守卫当时用整页数是对的 —— 换成动态标题的那天它就变成「每张卡 5 处链接」。
     ann_free = body_without_announcement()
-    for slug in ('2026-11-02-runai-open-source-rune', '2024-12-15-hygon', '2025-07-24-majnoon'):
+    # 跑马灯的条目来自内容源标题。这里把「正式完整标题 + 详情链接」钉死：
+    # 标题被截短、或链接被写成别的地址，重跑生成器也不会悄悄过。
+    official = '破晓石完成天数智芯算力卡适配'
+    official_href = '/blog/2026-11-20-iluvatar-mrc-v100/'
+    if post_field('2026-11-20-iluvatar-mrc-v100', 'title') != official:
+        MISS.append('iluvatar title is not the official full title')
+    if announce.anchor(official, official_href) not in body:
+        MISS.append('announcement: 跑马灯没有完整标题 %s -> %s' % (official, official_href))
+    if '>%s</h3>' % official not in ann_free:
+        MISS.append('homepage featured card missing the full official title')
+    for slug in ('2026-11-20-iluvatar-mrc-v100', '2024-12-15-hygon', '2025-07-24-majnoon'):
         got = ann_free.count('href="/blog/%s/"' % slug)
         if got != 1:
             MISS.append('blog card %s: %d local links, expected 1' % (slug, got))
@@ -2369,7 +2400,7 @@ def stage_guards():
     # 三张卡的封面必须来自内容源（与详情页同图）。need1 只证明「替换发生了」，
     # 这里独立再核一遍产物里真的有那三张 —— 万一 post_cover 给回别的路径、
     # 或某一张漏渲染，这条会咬住。
-    for slug in ('2026-11-02-runai-open-source-rune', '2024-12-15-hygon', '2025-07-24-majnoon'):
+    for slug in ('2026-11-20-iluvatar-mrc-v100', '2024-12-15-hygon', '2025-07-24-majnoon'):
         cover = post_cover(slug)
         if cover and f'src="{cover}"' not in body:
             MISS.append(f'blog card cover for {slug} is absent from the page: {cover}')

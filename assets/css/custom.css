@@ -626,6 +626,15 @@ html:not(.js-ready) [style*="opacity: 0"] { opacity: 1 !important; transform: no
   filter: none;
 }
 
+/* 成品海报封面（带标题和两侧 Logo）。is-wide-art 的 1.04 倍放大会切掉左右。
+   这一张完整落入卡片框，框的尺寸仍沿用三列卡版式。 */
+.tf-blog-overview .tf-blog-image-frame.is-poster img,
+.tf-blog-overview .tf-blog-card:hover .tf-blog-image-frame.is-poster img {
+  object-fit: contain;
+  object-position: center;
+  transform: none;
+}
+
 /* --------------------------------------------------------------------------
    导航 hover 动效的时长（2026-09-11）
 

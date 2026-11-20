@@ -119,6 +119,45 @@
   filter: none;
 }
 
+/* 天数智芯这篇的封面是带标题和 Logo 的成品海报。
+   详情框、列表图、相关阅读默认 object-fit: cover（列表还有 scale），
+   会切掉左上角两枚 Logo 和右侧芯片。这一张按原图比例完整显示。 */
+.tf-blog-detail-image:has(img[src$="20261120-iluvatar-cover.png"]) {
+  aspect-ratio: auto;
+  width: min(100% - 2rem, 46rem);
+  height: auto;
+}
+
+.tf-blog-detail-image:has(img[src$="20261120-iluvatar-cover.png"]) img {
+  object-fit: contain;
+  width: 100%;
+  height: auto;
+}
+
+.tf-blog-index-image:has(img[src$="20261120-iluvatar-cover.png"]) {
+  aspect-ratio: auto;
+  height: auto;
+  min-height: 0;
+}
+
+.tf-blog-index-image:has(img[src$="20261120-iluvatar-cover.png"]) img,
+.tf-blog-index-image:hover:has(img[src$="20261120-iluvatar-cover.png"]) img {
+  object-fit: contain;
+  width: 100%;
+  height: auto;
+  transform: none;
+  opacity: 1;
+  filter: none;
+}
+
+.tf-blog-detail-related-card > img[src$="20261120-iluvatar-cover.png"],
+.tf-blog-detail-related-card:hover > img[src$="20261120-iluvatar-cover.png"] {
+  object-fit: contain;
+  aspect-ratio: auto;
+  height: auto;
+  filter: none;
+}
+
 /* 窄屏：参数对比表是 5 列，硬塞进手机的正文栏会把每列压成一两个汉字宽。
    让表格自己横向滚动，比压缩列宽可读。`display:block` 之后 table 内部的
    thead / tbody 仍是表格布局，列对齐不受影响。 */

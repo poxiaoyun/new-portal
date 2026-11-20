@@ -2,7 +2,7 @@
 title: 破晓石完成天数智芯算力卡适配
 slug: 2026-11-20-iluvatar-mrc-v100
 date: 2026-11-20
-cover: assets/img/news/20261120-01-resource-pool-original.png
+cover: assets/img/news/20261120-iluvatar-cover.png
 tag: 算力适配
 summary: 国产算力加快进入智算中心和企业AI系统，平台对不同芯片的适配能力，正在影响硬件投入能否转化为可用的模型服务。近日，破晓石旗下晓石云Rune AI智算平台完成天数智芯Iluvatar MRC V100算力卡适配，支持算力池接入、模型推理、整卡与vGPU切分，以及算力卡运行监控，为采用国产GPU的用户增加了可选的部署方案。
 ---

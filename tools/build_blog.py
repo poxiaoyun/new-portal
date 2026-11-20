@@ -35,6 +35,7 @@ Tailwind 的那些属性（整页容器底色、以及 vendor 里缺的 `.prose 
 
 import os
 import re
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -146,6 +147,16 @@ def read_minutes(body):
     text = re.sub(r'<[^>]+>', '', mdrender.render(body))
     n = len(_CJK.findall(text)) + len(_LATIN.findall(text))
     return max(1, int(round(n / 400.0)))
+
+
+def png_wh(rel):
+    """读 PNG 的真实宽高。分享图的声明尺寸必须和文件一致，写错平台会直接弃图。"""
+    path = os.path.join(ROOT, rel)
+    with open(path, 'rb') as fh:
+        head = fh.read(24)
+    if len(head) < 24 or head[:8] != b'\x89PNG\r\n\x1a\n' or head[12:16] != b'IHDR':
+        raise SystemExit('%s: 分享图不是 PNG，无法声明宽高' % rel)
+    return struct.unpack('>II', head[16:24])
 
 
 def fmt_date_cn(iso):
@@ -388,6 +399,10 @@ def main():
 
     # ------------------------------------------------------------ 详情页
     for post in posts:
+        # 天数智芯这篇的分享图就是用户给的封面成品，不走 gen_og 再画一张
+        # （再画会把标题和 Logo 裁进 1200x630 的封面栏）。
+        image = (post['cover'] if post['slug'] == '2026-11-20-iluvatar-mrc-v100'
+                 else seo.og_image('blog', post['slug']))
         d, _h, _m = derive(
             ctx,
             out_rel='blog/%s/index.html' % post['slug'],
@@ -405,7 +420,8 @@ def main():
                 # 所以三者必然一致，不会出现「页面上写 3 月、sitemap 说今天」。
                 published=post['date'],
                 section=post['tag'],
-                image=seo.og_image('blog', post['slug']),
+                image=image,
+                image_size=png_wh(image),
                 # 面包屑：页面上真有一条层级线索 —— hero 里那颗分类胶囊就指回
                 # /blog（见 detail_hero）。没有可见层级的地方不要编。
                 breadcrumb_trail=[
